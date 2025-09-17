@@ -1,23 +1,16 @@
-import random
 from typing import Dict
-import re
+
 from bs4 import BeautifulSoup
 from telebot import TeleBot
 import requests
+import random
+import re
 
-from messengers.pages.tele_pages import SEARCH_BOX
 from messengers.telegram.admin_extractor import get_telegram_channel_admins_chat_type_router
-from scrapers.cmc.main_cmc_scraper import go_cmc_to_page, handle_standard_cmc_table
-from scrapers.pages.cmc_pages import NEW_BUTTON
 from utils.text_utils import get_telegram_group_from_link
-from utils.web_driver import get_local_web_driver, get_dedicated_local_web_driver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
 
 
-def enrich_telegram_data(driver, project: Dict) -> Dict:
+def enrich_telegram_data(driver, project: Dict, chrome_profile) -> Dict:
     """
     Enrich project with Telegram admin data.
 
@@ -160,43 +153,3 @@ def get_email_from_website(website):
     except Exception as e:
         print(f"Failed to scrape emails from {website}: {e}")
         return None
-
-def scrape_new_cmc_page(page_num:int, chrome_profile):
-    driver = get_local_web_driver()
-    driver.get("https://coinmarketcap.com")
-
-    new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-    driver.execute_script("arguments[0].click();", new_button)
-    time.sleep(0.5)
-
-    if page_num > 1:
-        go_cmc_to_page(driver, page_num)
-
-    time.sleep(2.5)
-    projects = handle_standard_cmc_table(driver)
-    driver.quit()
-    time.sleep(1)
-    print(projects)
-
-    driver = get_dedicated_local_web_driver(chrome_profile)
-    print(driver)
-    driver.get(f"https://web.telegram.org/k/")
-
-    WebDriverWait(driver, 60).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, SEARCH_BOX))
-    )
-    time.sleep(2)
-
-    enriched_data = []
-    for i, project in enumerate(projects):
-        enriched_project = project.copy()
-        enriched_project.update(enrich_telegram_data(driver, enriched_project))
-        enriched_project.update(enrich_email_data(enriched_project))
-        enriched_data.append(enriched_project)
-
-    driver.quit()
-    print(enriched_data)
-
-if __name__ == "__main__":
-    chrome_profile = "telegram_1"
-    scrape_new_cmc_page(1, chrome_profile)

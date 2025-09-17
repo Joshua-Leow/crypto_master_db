@@ -1,47 +1,23 @@
-# core/scrapers/cmc/main_cmc_scraper.py
+# scrapers/cmc/main_cmc_scraper.py
 """
 Main CMC scraping functions.
 """
 import time
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
+from MasterProjectManager import MasterProjectManager
+from config.private import get_mongodb_uri
+from messengers.pages.tele_pages import SEARCH_BOX
 from scrapers.pages.cmc_pages import *
 
 from scrapers.cmc.data_extractor import enrich_project_with_details
+from scrapers.pages.cmc_pages import NEW_BUTTON
+from utils.project_enrichment import enrich_telegram_data, enrich_email_data
+from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver
 
-
-def map_social_links(social_links):
-    """Map social links to their respective fields."""
-    link_field_map = {
-        "t.me": "telegram_link",
-        "linkedin": "linkedin_link",
-        "facebook": "facebook_link",
-        "instagram": "instagram_link",
-        "tiktok": "tiktok_link",
-        "youtube": "youtube_link",
-        "discord": "discord_link",
-        "reddit": "reddit_link",
-        "medium": "medium_link",
-        "twitter": "twitter_link",
-        "x.com": "twitter_link",
-        "mailto:": "email_link",
-        "github": "github_link",
-    }
-
-    mapped = {}
-    assigned_fields = set()
-
-    for link in social_links:
-        clean_link = link[8:] if link.startswith('mailto: ') else link
-        for keyword, field in link_field_map.items():
-            if keyword in link and field not in assigned_fields:
-                mapped[field] = clean_link
-                assigned_fields.add(field)
-                break
-
-    return mapped
 
 def go_cmc_to_page(driver, qpage, timeout=10):
     """
@@ -79,66 +55,6 @@ def go_cmc_to_page(driver, qpage, timeout=10):
             closest_page = min(available_pages, key=lambda x: abs(x - qpage))
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", page_map[closest_page])
             page_map[closest_page].click()
-
-
-def scrape_dexscan_project_rows_from_table(driver):
-    """
-    Scrape project rows from CMC table.
-
-    Args:
-        driver: Selenium WebDriver instance
-
-    Returns:
-        list: List of project dictionaries
-    """
-    results = []
-
-    try:
-        WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "table > tbody > tr > td > span"))
-        )
-        trs = driver.find_elements(By.CSS_SELECTOR, "table > tbody > tr")
-
-        print(f"CoinMarketCap scraper: Found {len(trs)} table rows")
-
-        for i, tr in enumerate(trs):
-            try:
-                driver.execute_script("arguments[0].scrollIntoView();", tr)
-
-                source_link = tr.find_element(By.XPATH, DEXSCAN_PROJECT_SOURCE_LINK)
-                ticker = tr.find_element(By.XPATH, DEXSCAN_PROJECT_NAME)
-                market_cap = tr.find_element(By.XPATH, DEXSCAN_PROJECT_MCAP_TEXT)
-                liquidity = tr.find_element(By.XPATH, DEXSCAN_PROJECT_LIQUIDITY_TEXT)
-
-                project_dict = {
-                    "project_name": ticker.text,
-                    "project_ticker": ticker.text.upper(),
-                    "market_cap": market_cap.text,
-                    "liquidity": liquidity.text,
-                    "sources": {"coinmarketcap": source_link.get_attribute("href")},
-                }
-
-                try:
-                    social_elements = tr.find_elements(By.XPATH, DEXSCAN_PROJECT_SOCIALS_LINKS)
-                    social_links = [elem.get_attribute("href") for elem in social_elements if elem.get_attribute("href")]
-
-                    if social_links:
-                        social_data = map_social_links(social_links)
-                        print(social_data)
-                        project_dict["socials"] = social_data
-
-                except Exception as se:
-                    print(f"Error parsing social links for row {i}: {se}")
-
-                results.append(project_dict)
-
-            except Exception as e:
-                print(f"Error extracting data for row {i}: {e}")
-
-    except Exception as e:
-        print(f"Error scraping table rows: {e}")
-
-    return results
 
 
 def scrape_standard_project_rows_from_table(driver):
@@ -182,119 +98,49 @@ def scrape_standard_project_rows_from_table(driver):
     return results
 
 
-def handle_standard_cmc_table(driver):
+def handle_standard_cmc_table(driver, chrome_profile):
     projects = scrape_standard_project_rows_from_table(driver)
     if not projects:
         print("No projects found in table")
         return []
 
     print(f"Scraped {len(projects)} projects, enriching data...")
+    driver2 = get_dedicated_local_web_driver(chrome_profile)
+    driver2.get(f"https://web.telegram.org/k/")
+    WebDriverWait(driver2, 60).until(EC.element_to_be_clickable((By.CSS_SELECTOR, SEARCH_BOX)))
+
+    manager = MasterProjectManager(get_mongodb_uri())
 
     enriched_projects = []
     for i, project in enumerate(projects[:10]):   # for testing purposes
     # for i, project in enumerate(projects):
         print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
         enriched_project = enrich_project_with_details(driver, project)
+        enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
+        enriched_project.update(enrich_email_data(enriched_project))
         enriched_projects.append(enriched_project)
+
+        project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
+
+    driver2.quit()
 
     print(f"Successfully scraped {len(enriched_projects)} projects")
     return enriched_projects
 
 
-def scrape_cmc_data(driver, query):
-    """
-    Main function to scrape CMC data based on query.
+def scrape_new_cmc_page(page_num:int, chrome_profile):
+    driver = get_local_web_driver()
+    driver.get("https://coinmarketcap.com")
 
-    Args:
-        query (dict): Query parameters
+    new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
+    driver.execute_script("arguments[0].click();", new_button)
+    time.sleep(0.5)
 
-    Returns:
-        list: List of enriched project data
-    """
-    try:
-        qtype = query.get('type')
-        qpage = query.get('page')
+    if page_num > 1:
+        go_cmc_to_page(driver, page_num)
 
-        # By Category
-        if qtype == "by category":
-            category = query.get('category')
-            driver.get(f"https://coinmarketcap.com/view/{category}/")
-            if qpage != 1:
-                go_cmc_to_page(driver, qpage)
-            time.sleep(2.5)
-            return handle_standard_cmc_table(driver)
-
-        # New Coins
-        elif qtype == "new coins":
-            print(qpage)
-            if qpage == 0:
-                driver.get("https://coinmarketcap.com")
-
-                new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-                driver.execute_script("arguments[0].click();", new_button)
-                time.sleep(0.5)
-
-                filters_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, FILTERS_BUTTON)))
-                driver.execute_script("arguments[0].click();", filters_button)
-                time.sleep(0.5)
-
-                dexscan_filters_max_age_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_FILTERS_MAX_AGE_INPUT)))
-                dexscan_filters_max_age_input.send_keys('24')
-                time.sleep(0.5)
-
-                dexscan_filters_apply_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_FILTERS_APPLY_BUTTON)))
-                driver.execute_script("arguments[0].click();", dexscan_filters_apply_button)
-            elif qpage == 1:
-                driver.get("https://coinmarketcap.com")
-
-                new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-                driver.execute_script("arguments[0].click();", new_button)
-                time.sleep(0.5)
-            else:
-                driver.get("https://coinmarketcap.com")
-
-                new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-                driver.execute_script("arguments[0].click();", new_button)
-                time.sleep(0.5)
-
-                go_cmc_to_page(driver, qpage)
-            time.sleep(2.5)
-            return handle_standard_cmc_table(driver)
-
-        # New DexScan
-        elif qtype == "new dexscan":
-            driver.get("https://coinmarketcap.com")
-            new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-            driver.execute_script("arguments[0].click();", new_button)
-            time.sleep(0.5)
-
-            dexscan_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_BUTTON)))
-            driver.execute_script("arguments[0].click();", dexscan_button)
-            time.sleep(0.5)
-
-            filters_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, FILTERS_BUTTON)))
-            driver.execute_script("arguments[0].click();", filters_button)
-
-            dexscan_filters_min_1_social_account_checkbox = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_FILTERS_MIN_1_SOCIAL_ACCOUNT_CHECKBOX)))
-            driver.execute_script("arguments[0].click();", dexscan_filters_min_1_social_account_checkbox)
-
-            dexscan_filters_min_liquidity_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_FILTERS_MIN_LIQUIDITY_INPUT)))
-            dexscan_filters_min_liquidity_input.send_keys('10000')
-
-            dexscan_filters_apply_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, DEXSCAN_FILTERS_APPLY_BUTTON)))
-            driver.execute_script("arguments[0].click();", dexscan_filters_apply_button)
-            time.sleep(2.5)
-            projects = scrape_dexscan_project_rows_from_table(driver)
-
-            return projects
-
-
-    except Exception as e:
-        print(f"Error in scrape_cmc_data: {e}")
-        return []
-    finally:
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
+    time.sleep(2.5)
+    projects = handle_standard_cmc_table(driver, chrome_profile)
+    driver.quit()
+    time.sleep(1)
+    print(projects)
