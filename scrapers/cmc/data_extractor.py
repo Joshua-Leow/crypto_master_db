@@ -191,6 +191,27 @@ def extract_all_social_links(driver):
         list[str]: List of href links found
     """
     links = []
+
+    try:
+        more_links = WebDriverWait(driver, 1).until(
+            EC.visibility_of_element_located((By.XPATH, "//div[@data-test='chip-more-social-links']"))
+        )
+        ActionChains(driver).move_to_element(more_links).perform()
+
+        # Wait for tooltip to appear
+        WebDriverWait(driver, 3).until(EC.visibility_of_element_located((
+            By.XPATH, "//div[@role='tooltip']/div/div/a")))
+
+        tooltip = driver.find_elements(By.XPATH, "//div[@role='tooltip']/div/div/a")
+
+        for elem in tooltip:
+            href = elem.get_attribute("href")
+            if href:
+                links.append(href)
+        return links
+    except:
+        pass
+
     try:
         WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, "div.CoinInfoLinks_info-items-wrapper__dHVKe a"))
@@ -235,7 +256,7 @@ def enrich_project_with_details(driver, project):
             print(f"Missing impt note via BeatifulSoup for {project.get('project_name', 'Unknown')}")
 
     except Exception as e:
-        app_logger.error(f"Error connecting to BeatifulSoup for {project.get('project_name', 'Unknown')}: {e}")
+        print(f"Error connecting to BeatifulSoup for {project.get('project_name', 'Unknown')}: {e}")
 
     try:
         driver.get(project["sources"]["coinmarketcap"])
