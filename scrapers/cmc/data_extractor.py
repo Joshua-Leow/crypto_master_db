@@ -12,7 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
 
 from scrapers.pages.cmc_pages import MARKET_CAP_TEXT, TAGS, TAGS_SECTION, TAGS_MODAL, TAGS_MODAL_2, \
-    EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT
+    EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT, ABOUT_TEXT
 
 from utils.text_utils import replace_string_at_index
 
@@ -140,6 +140,18 @@ def extract_important_notice_from_soup(soup):
     return None
 
 
+def extract_about_from_soup(soup):
+    try:
+        about_notes_target = soup.select_one(ABOUT_TEXT)
+        about_notes = about_notes_target.get_text() if about_notes_target else None
+    except Exception as e:
+        print(e)
+        return None
+    if about_notes is not None:
+        about_notes = about_notes[:4500]
+    return about_notes
+
+
 def extract_market_cap_text(driver):
     """
     Extract market cap text from the project page.
@@ -254,6 +266,12 @@ def enrich_project_with_details(driver, project):
             if impt: project["important_note"] = impt
         except Exception as e:
             print(f"Missing impt note via BeatifulSoup for {project.get('project_name', 'Unknown')}")
+
+        try:
+            about = extract_about_from_soup(soup)
+            if about: project["about"] = about
+        except Exception as e:
+            print(f"Missing about text via BeatifulSoup for {project.get('project_name', 'Unknown')}")
 
     except Exception as e:
         print(f"Error connecting to BeatifulSoup for {project.get('project_name', 'Unknown')}: {e}")

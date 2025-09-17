@@ -6,9 +6,7 @@ This module defines the public scrape_coingecko_data(query) API expected by the 
 Per docs/plan.md, CoinGecko is not yet implemented; we raise a clear NotImplementedError
 so callers can handle it gracefully.
 """
-from typing import Any, Dict, List
-
-from utils.logger import app_logger
+from typing import Dict, List, Any
 
 
 def scrape_coingecko_data(query: Dict[str, Any]) -> List[Dict[str, Any]]:
