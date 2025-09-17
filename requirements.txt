@@ -20,6 +20,6 @@ flatten_json>=0.1.14
 portalocker>=3.2.0
 
 # Database
-# pymongo
+pymongo
 # certifi
 # dnspython

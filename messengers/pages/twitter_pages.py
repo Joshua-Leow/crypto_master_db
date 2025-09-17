@@ -1,0 +1,10 @@
+PROFILE_PAGE = "//main[@role='main']"
+MESSAGE_BUTTON = "button[aria-label='Message']"
+MESSAGE_INPUT = "div.DraftEditor-editorContainer > div > div > div > div"
+EXISTING_CONVO = "//div[@data-testid='messageEntry']"
+MAYBE_LATER_BUTTON = "//button/div/span/span[text()='Maybe later']"
+
+FIRST_POST_COMMENT_BUTTON = "//*[@id='react-root']/div/div/div/main/div/div/div/div/div/div[3]/div/div/section/div/div/div[1]/div/div/article/div/div/div/div/div/div/div/div[1]/button/div/div[1]"
+FIRST_POST_TEXT = "(//div[@data-testid='tweetText'])[1]"
+COMMENT_INPUT = "//*[@id='layers']/div[2]/div/div/div/div/div/div[2]/div[2]/div/div/div/div[3]/div[2]/div[2]/div/div/div/div[1]/div[2]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div/div/div/div/div/div[2]/div/div/div/div"
+REPLY_BUTTON = "//button/div/span/span[text()='Reply']"
