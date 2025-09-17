@@ -1,4 +1,4 @@
-# core/messengers/telegram/admin_extractor.py
+# messengers/telegram/admin_extractor.py
 """
 Telegram admin extraction functions.
 """
@@ -9,11 +9,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import TimeoutException
 
 from messengers.pages.tele_pages import *
-from messengers.telegram.tele_sender import _reset_to_telegram_main
 from utils.local_state_manager import set_local_account_last_join, allocation_account
+
+def _reset_to_telegram_main(driver):
+    """Return to Telegram main page."""
+    driver.get("https://web.telegram.org/k/")
 
 
 def handle_telegram_channel(driver, channel, chrome_profile):
