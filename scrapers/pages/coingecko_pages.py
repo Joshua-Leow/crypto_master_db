@@ -1,3 +1,6 @@
+NAVIGATION_NUMBERS = "//nav[@role='navigation']/span"
+PROJECT_LINK__7 = "//table/tbody//tr[x]/td/a"
+
 #################
 # in route /new #
 #################
