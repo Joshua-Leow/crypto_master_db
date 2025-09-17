@@ -1,0 +1,25 @@
+# Web Scraping
+selenium>=4.15.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+webdriver-manager>=4.0.0
+
+# Telegram Integration
+telebot>=0.0.5
+
+# Data Processing
+pandas>=2.1.0
+
+# Utilities
+pyyaml>=6.0.2
+# cryptography>=45.0.5
+
+# Development
+flatten_json>=0.1.14
+
+portalocker>=3.2.0
+
+# Database
+# pymongo
+# certifi
+# dnspython
