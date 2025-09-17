@@ -1,0 +1,15 @@
+__pycache__/
+env/
+*.pyc
+*.pyo
+*.pyd
+*.Python
+env/
+.ipynb_checkpoints
+.DS_Store
+resources/
+credentials.json
+.idea/
+/config/private.py
+config/user_config/user_config.key
+config/user_config/user_config.enc
