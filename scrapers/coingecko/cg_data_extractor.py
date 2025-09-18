@@ -182,11 +182,11 @@ def extract_exchanges(driver, timeout=2, pause=1):
     # Set rows per page to 100
     try:
         rows_option = wait.until(EC.presence_of_element_located((By.XPATH, EXCHANGE_ROWS_OPTION)))
-        ActionChains(driver).move_to_element(rows_option).perform()
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", rows_option)
         rows_option.click()
         rows_100 = driver.find_element(By.XPATH, EXCHANGE_ROWS_100)
         rows_100.click()
-        time.sleep(pause)
+        time.sleep(2)
     except: pass
 
     while True:
