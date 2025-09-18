@@ -220,14 +220,14 @@ def handle_standard_cg_table(driver, chrome_profile):
     enriched_projects = []
     for i, project in enumerate(projects[:10]):  # for testing purposes
         # for i, project in enumerate(projects):
-        print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
+        print(f"Enriching project {i + 1}/{len(projects)}: {project["sources"]["coingecko"]}")
         enriched_project = enrich_project_with_details(driver, project)
         enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
         enriched_project.update(enrich_email_data(enriched_project))
         enriched_projects.append(enriched_project)
 
-        project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
-
+        project_uid = manager.upsert_project(enriched_project, "coingecko")
+    # print(enriched_projects)
     driver2.quit()
 
     print(f"Successfully scraped {len(enriched_projects)} projects")

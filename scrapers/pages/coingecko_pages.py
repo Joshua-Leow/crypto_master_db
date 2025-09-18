@@ -29,6 +29,11 @@ MORE_INFO_BUTTON = "#gecko-coin-page-container > div > div > div:nth-child(x) > 
 CHAINS_INFO_LINKS = "#gecko-coin-page-container > div > div > div:nth-child(x) > div > div > div > div > div > a"
 CATEGORY_INFO_LINKS = "#gecko-coin-page-container > div > div > div:nth-child(x) > div > div > div > div > div > div > a"
 
+EXCHANGE_ROWS_OPTION = "//nav[@role='navigation']/following-sibling::div/div/div/button"
+EXCHANGE_ROWS_100 = "//nav[@role='navigation']/following-sibling::div/div/div/div/div/span[contains(text(), '100')]"
+EXCHANGE_LINK__14 = "//table/tbody/tr[x]/td[2]/div/a"
+NEXT_PAGE_BUTTON = "//nav[@role='navigation']/span/span[@aria-label='next']"
+
 WEBSITE_LINK = "#gecko-coin-page-container > div> div > div:nth-child(2) > div > a"
 SOCIALS_LINKS = "#gecko-coin-page-container > div> div > div:nth-child(4) > div > a"
 ABOUT_TEXT = "#about > div > div.coin-page-read-more.gecko-override-links.tw-relative"
