@@ -24,6 +24,11 @@ FDV_TEXT = "#gecko-coin-page-container > div > div:nth-child(2) > table > tbody 
 # MAX_SUPPLY_TEXT = "#section-coin-stats > div > div > dl > div:nth-child(6) > div > div.sc-65e7f566-0.eQBACe.StatsInfoBox_content-wrapper__onk_o > div > div > div > span"
 # CIRCULATING_SUPPLY_TEXT = "#section-coin-stats > div > div > dl > div.sc-65e7f566-0.eQBACe.CoinMetrics_group-item-full__ncOjB > div > dd > div > div:nth-child(1) > span"
 
+INFO_SECTION_LINKS = "#gecko-coin-page-container > div> div > div:nth-child(x) > div > a"
+MORE_INFO_BUTTON = "#gecko-coin-page-container > div > div > div:nth-child(x) > div > div > div"
+CHAINS_INFO_LINKS = "#gecko-coin-page-container > div > div > div:nth-child(x) > div > div > div > div > div > a"
+CATEGORY_INFO_LINKS = "#gecko-coin-page-container > div > div > div:nth-child(x) > div > div > div > div > div > div > a"
+
 WEBSITE_LINK = "#gecko-coin-page-container > div> div > div:nth-child(2) > div > a"
 SOCIALS_LINKS = "#gecko-coin-page-container > div> div > div:nth-child(4) > div > a"
 ABOUT_TEXT = "#about > div > div.coin-page-read-more.gecko-override-links.tw-relative"

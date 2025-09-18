@@ -22,156 +22,228 @@ from selenium.webdriver.support.wait import WebDriverWait
 from MasterProjectManager import MasterProjectManager
 from config.private import get_mongodb_uri
 from messengers.pages.tele_pages import SEARCH_BOX
+from messengers.telegram.admin_extractor import _reset_to_telegram_main
+from scrapers.coingecko.cg_data_extractor import enrich_project_with_details
 from scrapers.pages.coingecko_pages import *
 
 from utils.project_enrichment import enrich_telegram_data, enrich_email_data
+from utils.text_utils import replace_string_at_index
 from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver
 
 
-def keyboard_1press(keyboard, key1):
-    keyboard.press(key1)
-    keyboard.release(key1)
-    time.sleep(1)
+# def keyboard_1press(keyboard, key1):
+#     keyboard.press(key1)
+#     keyboard.release(key1)
+#     time.sleep(1)
+#
+# def keyboard_2press(keyboard, key1, key2):
+#     keyboard.press(key1)
+#     if key2 is str:
+#         keyboard.type(key2)
+#     else:
+#         keyboard.press(key2)
+#         keyboard.release(key2)
+#     keyboard.release(key1)
+#     time.sleep(1)
+#
+# def keyboard_3press(keyboard, key1, key2, key3):
+#     keyboard.press(key1)
+#     keyboard.press(key2)
+#     if key3 is str:
+#         keyboard.type(key3)
+#     else:
+#         keyboard.press(key3)
+#         keyboard.release(key3)
+#     keyboard.release(key2)
+#     keyboard.release(key1)
+#     time.sleep(1)
+#
+#
+# def click_image(mouse, image_path):
+#     """
+#     Search for an image and click if found.
+#
+#     :param mouse: pynput mouse controller
+#     :param image_path: Path to the image to search on the screen.
+#     """
+#     try:
+#         location = pyautogui.locateOnScreen(image_path)
+#         if location:
+#             print(f"Image found at {location}!")
+#
+#             # Move the mouse to the center of the found image
+#             center_x = location.left/2 + location.width/4
+#             center_y = location.top/2 + location.height/4
+#             mouse.position = (center_x, center_y)
+#             time.sleep(1)
+#
+#             mouse.click(Button.left, 1)
+#             print(f"Clicked at ({center_x}, {center_y})")
+#             time.sleep(1)
+#             return True
+#     except pyautogui.ImageNotFoundException as e:
+#         return False
+#
+#
+# def get_coingecko_table(page='new'):
+#     keyboard = pynput.keyboard.Controller()
+#
+#     # Open Mac spotlight search
+#     keyboard_2press(keyboard, Key.cmd, Key.space)
+#     # go to chrome
+#     keyboard.type("chrome")
+#     time.sleep(2)
+#     keyboard_1press(keyboard, Key.enter)
+#     # open new tab
+#     keyboard_2press(keyboard, Key.cmd, "t")
+#     # go to https://www.coingecko.com/en/new-cryptocurrencies
+#     if page != 'new':
+#         link = "https://www.coingecko.com/?page=" + str(page)
+#     else:
+#         link = "coingecko.com/en/new-cryptocurrencies"
+#     keyboard.type(link)
+#     time.sleep(1)
+#     keyboard_1press(keyboard, Key.enter)
+#     time.sleep(5)
+#     # open inspect tool
+#     keyboard_1press(keyboard, Key.f12)
+#     time.sleep(1)
+#     # Click elements text
+#     mouse = pynput.mouse.Controller()
+#     elements_text = str(Path(os.path.join(os.getcwd(), "data/image_captures/elements_text.png")))
+#     click_image(mouse, elements_text)
+#     # ctrl + f to find in inspect
+#     keyboard_2press(keyboard, Key.cmd, "f")
+#     # search for <table>
+#     keyboard.type("<table")
+#     time.sleep(1)
+#     # Edit as HTML (f2)
+#     keyboard_1press(keyboard, Key.f2)
+#     # ctrl + a to select all
+#     keyboard_2press(keyboard, Key.cmd, "a")
+#     # ctrl + c to select all
+#     keyboard_2press(keyboard, Key.cmd, "c")
+#     keyboard_2press(keyboard, Key.cmd, "c")
+#     # ctrl + w to close tab
+#     keyboard_2press(keyboard, Key.cmd, "w")
+#     # Open Mac spotlight search
+#     keyboard_2press(keyboard, Key.cmd, Key.space)
+#     # go to finder
+#     keyboard.type("finder")
+#     time.sleep(2)
+#     keyboard_1press(keyboard, Key.enter)
+#     # cmd shift G in finder to search by path
+#     keyboard_3press(keyboard, Key.cmd, Key.shift, "g")
+#     # search for this path /Users/joshualeow/Desktop/
+#     keyboard.type("/Users/joshualeow/Desktop/")
+#     time.sleep(2)
+#     keyboard_1press(keyboard, Key.enter)
+#     # cmd shift G in finder to search by path
+#     keyboard_3press(keyboard, Key.cmd, Key.shift, "g")
+#     # search for this path /Users/joshualeow/Documents/Projects/scrape_CMC/data/
+#     keyboard.type("/Users/joshualeow/Documents/Projects/scrape_CMC/data/cg_table/")
+#     time.sleep(2)
+#     keyboard_1press(keyboard, Key.enter)
+#     # tab to select first item
+#     keyboard_1press(keyboard, Key.tab)
+#     # ctrl o to open in TextEdit
+#     keyboard_2press(keyboard, Key.cmd, "o")
+#     # ctrl a to select all
+#     keyboard_2press(keyboard, Key.cmd, "a")
+#     # ctrl v to paste
+#     keyboard_2press(keyboard, Key.cmd, "v")
+#     # ctrl s to save
+#     keyboard_2press(keyboard, Key.cmd, "s")
+#     # ctrl w to close TextEdit
+#     keyboard_2press(keyboard, Key.cmd, "w")
 
-def keyboard_2press(keyboard, key1, key2):
-    keyboard.press(key1)
-    if key2 is str:
-        keyboard.type(key2)
-    else:
-        keyboard.press(key2)
-        keyboard.release(key2)
-    keyboard.release(key1)
-    time.sleep(1)
 
-def keyboard_3press(keyboard, key1, key2, key3):
-    keyboard.press(key1)
-    keyboard.press(key2)
-    if key3 is str:
-        keyboard.type(key3)
-    else:
-        keyboard.press(key3)
-        keyboard.release(key3)
-    keyboard.release(key2)
-    keyboard.release(key1)
-    time.sleep(1)
-
-
-def click_image(mouse, image_path):
+def go_cg_to_page(driver, qpage, timeout=10):
     """
-    Search for an image and click if found.
+    Navigate to the requested page number using pagination controls.
 
-    :param mouse: pynput mouse controller
-    :param image_path: Path to the image to search on the screen.
+    Args:
+        driver: Selenium WebDriver instance.
+        qpage (int): Target page number.
+        timeout (int): Wait timeout in seconds.
     """
-    try:
-        location = pyautogui.locateOnScreen(image_path)
-        if location:
-            print(f"Image found at {location}!")
+    while True:
+        # Wait for pagination links
+        page_elements = WebDriverWait(driver, timeout).until(
+            EC.presence_of_all_elements_located((By.XPATH, NAVIGATION_NUMBERS))
+        )
 
-            # Move the mouse to the center of the found image
-            center_x = location.left/2 + location.width/4
-            center_y = location.top/2 + location.height/4
-            mouse.position = (center_x, center_y)
-            time.sleep(1)
+        # Extract page numbers as integers where possible
+        page_map = {}
+        for el in page_elements:
+            text = el.text.strip()
+            if text.isdigit():
+                page_map[int(text)] = el
 
-            mouse.click(Button.left, 1)
-            print(f"Clicked at ({center_x}, {center_y})")
-            time.sleep(1)
-            return True
-    except pyautogui.ImageNotFoundException as e:
-        return False
+        if not page_map:
+            raise ValueError("No numeric pagination links found")
+
+        # Find closest page to qpage
+        available_pages = sorted(page_map.keys())
+        if qpage in available_pages:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", page_map[qpage])
+            page_map[qpage].click()
+            break
+        else:
+            # Closest match
+            closest_page = min(available_pages, key=lambda x: abs(x - qpage))
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", page_map[closest_page])
+            page_map[closest_page].click()
 
 
-def get_coingecko_table(page='new'):
-    keyboard = pynput.keyboard.Controller()
+def get_project_links(driver):
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//table/tbody//tr[1]/td/a")))
+    projects = []
+    for i in range(1, 101):
+        PROJECT_LINK = replace_string_at_index(PROJECT_LINK__7, -7, str(i))
+        project_link = driver.find_element(By.XPATH, PROJECT_LINK).get_attribute("href")
+        project = {"sources": {"coingecko": project_link}}
+        projects.append(project)
+    return projects
 
-    # Open Mac spotlight search
-    keyboard_2press(keyboard, Key.cmd, Key.space)
-    # go to chrome
-    keyboard.type("chrome")
-    time.sleep(2)
-    keyboard_1press(keyboard, Key.enter)
-    # open new tab
-    keyboard_2press(keyboard, Key.cmd, "t")
-    # go to https://www.coingecko.com/en/new-cryptocurrencies
-    if page != 'new':
-        link = "https://www.coingecko.com/?page=" + str(page)
-    else:
-        link = "coingecko.com/en/new-cryptocurrencies"
-    keyboard.type(link)
-    time.sleep(1)
-    keyboard_1press(keyboard, Key.enter)
-    time.sleep(5)
-    # open inspect tool
-    keyboard_1press(keyboard, Key.f12)
-    time.sleep(1)
-    # Click elements text
-    mouse = pynput.mouse.Controller()
-    elements_text = str(Path(os.path.join(os.getcwd(), "data/image_captures/elements_text.png")))
-    click_image(mouse, elements_text)
-    # ctrl + f to find in inspect
-    keyboard_2press(keyboard, Key.cmd, "f")
-    # search for <table>
-    keyboard.type("<table")
-    time.sleep(1)
-    # Edit as HTML (f2)
-    keyboard_1press(keyboard, Key.f2)
-    # ctrl + a to select all
-    keyboard_2press(keyboard, Key.cmd, "a")
-    # ctrl + c to select all
-    keyboard_2press(keyboard, Key.cmd, "c")
-    keyboard_2press(keyboard, Key.cmd, "c")
-    # ctrl + w to close tab
-    keyboard_2press(keyboard, Key.cmd, "w")
-    # Open Mac spotlight search
-    keyboard_2press(keyboard, Key.cmd, Key.space)
-    # go to finder
-    keyboard.type("finder")
-    time.sleep(2)
-    keyboard_1press(keyboard, Key.enter)
-    # cmd shift G in finder to search by path
-    keyboard_3press(keyboard, Key.cmd, Key.shift, "g")
-    # search for this path /Users/joshualeow/Desktop/
-    keyboard.type("/Users/joshualeow/Desktop/")
-    time.sleep(2)
-    keyboard_1press(keyboard, Key.enter)
-    # cmd shift G in finder to search by path
-    keyboard_3press(keyboard, Key.cmd, Key.shift, "g")
-    # search for this path /Users/joshualeow/Documents/Projects/scrape_CMC/data/
-    keyboard.type("/Users/joshualeow/Documents/Projects/scrape_CMC/data/cg_table/")
-    time.sleep(2)
-    keyboard_1press(keyboard, Key.enter)
-    # tab to select first item
-    keyboard_1press(keyboard, Key.tab)
-    # ctrl o to open in TextEdit
-    keyboard_2press(keyboard, Key.cmd, "o")
-    # ctrl a to select all
-    keyboard_2press(keyboard, Key.cmd, "a")
-    # ctrl v to paste
-    keyboard_2press(keyboard, Key.cmd, "v")
-    # ctrl s to save
-    keyboard_2press(keyboard, Key.cmd, "s")
-    # ctrl w to close TextEdit
-    keyboard_2press(keyboard, Key.cmd, "w")
+
+def handle_standard_cg_table(driver, chrome_profile):
+    projects = get_project_links(driver)
+    if not projects:
+        print("No projects found in table")
+
+    print(f"Scraped {len(projects)} projects, enriching data...")
+    driver2 = get_dedicated_local_web_driver(chrome_profile)
+    _reset_to_telegram_main(driver2)
+    manager = MasterProjectManager(get_mongodb_uri())
+
+    enriched_projects = []
+    for i, project in enumerate(projects[:10]):  # for testing purposes
+        # for i, project in enumerate(projects):
+        print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
+        enriched_project = enrich_project_with_details(driver, project)
+        enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
+        enriched_project.update(enrich_email_data(enriched_project))
+        enriched_projects.append(enriched_project)
+
+        project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
+
+    driver2.quit()
+
+    print(f"Successfully scraped {len(enriched_projects)} projects")
+    return enriched_projects
 
 
 
-def scrape_cg_page(page_num: int):
+
+def scrape_cg_page(page_num: int, chrome_profile: str):
     """Placeholder for CoinGecko scraping."""
     driver = get_local_web_driver()
-    driver.get(f"https://coingecko.com/?page={page_num}")
-    time.sleep(10)
+    driver.get("https://coingecko.com")
+    if page_num > 1:
+        go_cg_to_page(driver, page_num)
+    time.sleep(1)
 
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//table/tbody//tr[1]/td/a")))
-    # TODO: replace PROJECT_LINK__7 text and get all hyperlinks
-    # driver.execute_script("arguments[0].click();", new_button)
-    # time.sleep(0.5)
+    projects = handle_standard_cg_table(driver, chrome_profile)
+    driver.quit()
 
-    # if page_num > 1:
-    #     go_cg_to_page(driver, page_num)
-    #
-    # time.sleep(2.5)
-    # projects = handle_standard_cmc_table(driver, chrome_profile)
-    # driver.quit()
-    # time.sleep(1)
-    # print(projects)

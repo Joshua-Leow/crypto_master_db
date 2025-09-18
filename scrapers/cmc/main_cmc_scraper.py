@@ -11,6 +11,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from MasterProjectManager import MasterProjectManager
 from config.private import get_mongodb_uri
 from messengers.pages.tele_pages import SEARCH_BOX
+from messengers.telegram.admin_extractor import _reset_to_telegram_main
 from scrapers.pages.cmc_pages import *
 
 from scrapers.cmc.data_extractor import enrich_project_with_details
@@ -106,9 +107,7 @@ def handle_standard_cmc_table(driver, chrome_profile):
 
     print(f"Scraped {len(projects)} projects, enriching data...")
     driver2 = get_dedicated_local_web_driver(chrome_profile)
-    driver2.get(f"https://web.telegram.org/k/")
-    WebDriverWait(driver2, 60).until(EC.element_to_be_clickable((By.CSS_SELECTOR, SEARCH_BOX)))
-
+    _reset_to_telegram_main(driver2)
     manager = MasterProjectManager(get_mongodb_uri())
 
     enriched_projects = []
@@ -138,8 +137,8 @@ def scrape_new_cmc_page(page_num:int, chrome_profile):
 
     if page_num > 1:
         go_cmc_to_page(driver, page_num)
-
     time.sleep(2.5)
+
     projects = handle_standard_cmc_table(driver, chrome_profile)
     driver.quit()
     time.sleep(1)
