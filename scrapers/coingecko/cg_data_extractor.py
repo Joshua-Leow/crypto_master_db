@@ -236,7 +236,7 @@ def enrich_project_with_details(driver, project):
             project_name = driver.find_element(By.CSS_SELECTOR, COIN_NAME_TEXT).text
             if project_name: project["project_name"] = project_name
         except Exception as e:
-            print(f"Missing project_name via Selenium for {project["sources"]["coingecko"]}")
+            print(f"Missing project_name via Selenium for {project['sources']['coingecko']}")
 
         try:
             symbol = get_coin_symbol(driver)
