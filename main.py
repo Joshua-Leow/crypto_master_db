@@ -2,8 +2,10 @@ from scrapers.cmc.main_cmc_scraper import scrape_new_cmc_page
 from scrapers.coingecko.main_cg_scraper import scrape_cg_page
 
 if __name__ == "__main__":
-    chrome_profile = "telegram_1"
-    page_num = 2
+    chrome_num = input("Enter browser number (1-7)")
+    chrome_profile = "telegram_" + chrome_num
+    page_num = int(input("Enter CG page number (1-189)"))
 
+    print(f"starting scrape for page {page_num} with profile {chrome_profile}")
     # scrape_new_cmc_page(page_num, chrome_profile)
     scrape_cg_page(page_num, chrome_profile)

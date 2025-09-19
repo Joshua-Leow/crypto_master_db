@@ -28,7 +28,7 @@ from scrapers.pages.coingecko_pages import *
 
 from utils.project_enrichment import enrich_telegram_data, enrich_email_data
 from utils.text_utils import replace_string_at_index
-from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver
+from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver, get_local_headless_web_driver
 
 
 # def keyboard_1press(keyboard, key1):
@@ -238,7 +238,7 @@ def handle_standard_cg_table(driver, chrome_profile):
 
 def scrape_cg_page(page_num: int, chrome_profile: str):
     """Placeholder for CoinGecko scraping."""
-    driver = get_local_web_driver()
+    driver = get_local_headless_web_driver()
     driver.get("https://coingecko.com")
     if page_num > 1:
         go_cg_to_page(driver, page_num)

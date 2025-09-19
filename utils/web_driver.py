@@ -111,7 +111,7 @@ def get_dedicated_local_web_driver(chrome_profile: str, retries: int = 2, delay:
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-gpu")
             options.add_argument("--window-size=1920,1080")
-            # options.add_argument("--headless=new")  # Must Enable headless runs for remote EC2
+            options.add_argument("--headless=new")  # Must Enable headless runs for remote EC2
             options.add_argument(
                 "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/125.0.6422.141 Safari/537.36"
