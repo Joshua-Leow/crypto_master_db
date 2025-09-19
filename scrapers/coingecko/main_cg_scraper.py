@@ -218,7 +218,7 @@ def handle_standard_cg_table(driver, chrome_profile):
     manager = MasterProjectManager(get_mongodb_uri())
 
     enriched_projects = []
-    for i, project in enumerate(projects[:10]):  # for testing purposes
+    for i, project in enumerate(projects):  # for testing purposes
         # for i, project in enumerate(projects):
         print(f"Enriching project {i + 1}/{len(projects)}: {project['sources']['coingecko']}")
         enriched_project = enrich_project_with_details(driver, project)
