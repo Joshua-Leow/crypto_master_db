@@ -1,7 +1,9 @@
 from pymongo import MongoClient, ASCENDING
 from datetime import datetime
 import uuid
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple, Set
+import json
+from copy import deepcopy
 
 from config.private import get_mongodb_uri
 
@@ -52,6 +54,105 @@ class MasterProjectManager:
 
         print("MongoDB indexes created successfully")
 
+    @staticmethod
+    def _is_empty(value: Any) -> bool:
+        """Treat None, '', empty list/dict as empty. Numbers and False are not empty."""
+        if value is None:
+            return True
+        if isinstance(value, str):
+            return value.strip() == ""
+        if isinstance(value, dict):
+            return len(value) == 0
+        if isinstance(value, (list, tuple, set)):
+            return len(value) == 0
+        return False
+
+    @staticmethod
+    def _signature(item: Any) -> str:
+        """Stable signature for list de-duplication of unstructured items."""
+        try:
+            return json.dumps(item, sort_keys=True, separators=(",", ":"))
+        except Exception:
+            return f"{type(item).__name__}:{repr(item)}"
+
+    def _merge_lists(self, a: List[Any], b: List[Any], prefer_b: bool) -> List[Any]:
+        """
+        Union with order. If prefer_b, take b items first, then fill with a's uniques.
+        Works for primitives and list-of-dicts without a fixed identity.
+        """
+        base = b[:] + a[:] if prefer_b else a[:] + b[:]
+        out, seen = [], set()
+        for itm in base:
+            sig = self._signature(itm)
+            if sig not in seen:
+                seen.add(sig)
+                out.append(itm)
+        return out
+
+    def _deep_merge(
+            self,
+            a: Any,
+            b: Any,
+            prefer_b: bool,
+            protected_keys: Set[str],
+            path: Tuple[str, ...] = (),
+    ) -> Any:
+        """
+        Non-destructive deep merge.
+        - prefer_b=True: b wins for scalars when both non-empty.
+        - Dicts merge recursively.
+        - Lists union with de-duplication.
+        - Never overwrite non-empty with empty.
+        - Protected keys never change unless a is empty.
+        """
+        # Different types: pick b only if meaningful and preferred
+        if type(a) is not type(b):
+            return b if (prefer_b and not self._is_empty(b)) or self._is_empty(a) else a
+
+        # Dicts
+        if isinstance(a, dict):
+            result = deepcopy(a)
+            for k, v_b in b.items():
+                if k == "sources":
+                    # handled outside
+                    continue
+                v_a = result.get(k, None)
+
+                # protect certain top-level keys from mutation
+                if len(path) == 0 and k in protected_keys:
+                    if self._is_empty(v_a) and not self._is_empty(v_b):
+                        result[k] = deepcopy(v_b)
+                    # else keep existing
+                    continue
+
+                if v_a is None:
+                    if not self._is_empty(v_b):
+                        result[k] = deepcopy(v_b)
+                    continue
+
+                # both sides have a value
+                if isinstance(v_a, dict) and isinstance(v_b, dict):
+                    result[k] = self._deep_merge(v_a, v_b, prefer_b, protected_keys, path + (k,))
+                elif isinstance(v_a, list) and isinstance(v_b, list):
+                    result[k] = self._merge_lists(v_a, v_b, prefer_b)
+                else:
+                    # scalars or mismatched subtypes
+                    if self._is_empty(v_a) and not self._is_empty(v_b):
+                        result[k] = deepcopy(v_b)
+                    elif not self._is_empty(v_b) and prefer_b:
+                        result[k] = deepcopy(v_b)
+                    # else keep v_a
+            return result
+
+        # Lists
+        if isinstance(a, list):
+            return self._merge_lists(a, b, prefer_b)
+
+        # Scalars
+        if self._is_empty(a) and not self._is_empty(b):
+            return b
+        return b if (prefer_b and not self._is_empty(b)) else a
+
     def _get_source_priority_index(self, source: str) -> int:
         """Get priority index of a source (lower number = higher priority)"""
         try:
@@ -78,54 +179,60 @@ class MasterProjectManager:
 
     def _merge_data_by_priority(self, existing_data: Dict, new_data: Dict, new_source: str) -> Dict:
         """
-        Merge new data with existing data based on source priority
-
-        Args:
-            existing_data: Current project data in database
-            new_data: New project data to merge
-            new_source: Source of the new data
-
-        Returns:
-            Merged data dictionary
+        Deep, non-destructive merge with source priority.
+        Higher priority updates missing or conflicting fields but never deletes existing data.
+        Lists are unioned with de-duplication. Dicts merge recursively.
         """
-        if not existing_data.get('sources'):
-            # First time data, just add the new source
-            merged_data = new_data.copy()
-            merged_data['sources'] = {
-                new_source: {
-                    'url': new_data.get('sources', {}).get(new_source, ''),
-                    'last_updated': datetime.now().strftime('%Y-%m-%d')
-                }
-            }
-            return merged_data
+        merged_data = deepcopy(existing_data) if existing_data else {}
+        merged_data.setdefault("sources", {})
 
-        # Get current highest priority source
-        current_highest_source = self._get_highest_priority_source(existing_data['sources'])
-        current_highest_priority = self._get_source_priority_index(current_highest_source)
-        new_source_priority = self._get_source_priority_index(new_source)
+        # Update sources: add/refresh new_source and carry over any other provided sources
+        now_str = datetime.now().strftime('%Y-%m-%d')
+        new_sources_raw = new_data.get("sources", {}) or {}
 
-        merged_data = existing_data.copy()
-
-        # Update sources with new source info
-        if 'sources' not in merged_data:
-            merged_data['sources'] = {}
-
-        merged_data['sources'][new_source] = {
-            'url': new_data.get('sources', {}).get(new_source, ''),
-            'last_updated': datetime.now().strftime('%Y-%m-%d')
+        # Always record the incoming new_source explicitly
+        new_src_url = new_sources_raw.get(new_source, "")
+        merged_data["sources"][new_source] = {
+            "url": new_src_url,
+            "last_updated": now_str,
         }
 
-        if new_source_priority <= current_highest_priority:
-            # New source has higher/equal priority - update all fields
-            for key, value in new_data.items():
-                if key != 'sources' and value is not None:
-                    merged_data[key] = value
-        else:
-            # New source has lower priority - only add missing fields
-            for key, value in new_data.items():
-                if key != 'sources' and value is not None:
-                    if key not in merged_data or merged_data[key] is None or merged_data[key] == "":
-                        merged_data[key] = value
+        # Optionally ingest any other sources present in the payload too
+        for src, url in new_sources_raw.items():
+            if src == new_source:
+                continue
+            merged_data["sources"][src] = {
+                "url": url,
+                "last_updated": now_str,
+            }
+
+        # Nothing else to merge
+        if not existing_data:
+            # First write wins, nothing to compare against
+            tmp = deepcopy(new_data)
+            tmp.pop("sources", None)
+            protected = {"project_uid", "project_name", "project_ticker", "created_at"}
+            merged_payload = self._deep_merge({}, tmp, True, protected)
+            merged_data.update(merged_payload)
+            return merged_data
+
+        # Determine priority
+        current_highest_source = self._get_highest_priority_source(merged_data.get("sources", {}))
+        current_highest_priority = self._get_source_priority_index(current_highest_source)
+        new_source_priority = self._get_source_priority_index(new_source)
+        prefer_new = new_source_priority <= current_highest_priority
+
+        # Merge payloads excluding 'sources'
+        existing_payload = deepcopy(existing_data)
+        existing_payload.pop("sources", None)
+        incoming_payload = deepcopy(new_data)
+        incoming_payload.pop("sources", None)
+
+        protected = {"project_uid", "project_name", "project_ticker", "created_at"}
+        merged_payload = self._deep_merge(existing_payload, incoming_payload, prefer_new, protected)
+        # Reattach merged payload
+        for k, v in merged_payload.items():
+            merged_data[k] = v
 
         return merged_data
 
