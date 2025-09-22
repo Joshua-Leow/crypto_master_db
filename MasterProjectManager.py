@@ -1,3 +1,5 @@
+import re
+
 from pymongo import MongoClient, ASCENDING
 from datetime import datetime
 import uuid
@@ -42,6 +44,9 @@ class MasterProjectManager:
 
         # Unique index on project_uid
         self.collection.create_index("project_uid", unique=True, name="project_uid_idx")
+
+        # Unique index on project_ticker
+        self.collection.create_index("project_ticker", name="project_ticker_idx")
 
         # Index on categories for filtering
         self.collection.create_index("category", name="category_idx")
@@ -237,19 +242,16 @@ class MasterProjectManager:
         return merged_data
 
     def find_existing_project(self, project_name: str, project_ticker: str) -> Optional[Dict]:
-        """
-        Find existing project by name and ticker
+        """Case-insensitive name + uppercase ticker match."""
+        name = (project_name or "").strip()
+        ticker = (project_ticker or "").upper().strip()
+        if not name or not ticker:
+            return None
 
-        Args:
-            project_name: Name of the project
-            project_ticker: Ticker symbol (should be uppercase)
-
-        Returns:
-            Existing project document or None
-        """
+        pattern = f"^{re.escape(name)}$"  # exact match, ignore case
         return self.collection.find_one({
-            "project_name": project_name,
-            "project_ticker": project_ticker.upper()
+            "project_name": {"$regex": pattern, "$options": "i"},
+            "project_ticker": ticker,
         })
 
     def upsert_project(self, project_data: Dict, source: str) -> str:
@@ -340,6 +342,11 @@ class MasterProjectManager:
         """Get project by its unique ID"""
         return self.collection.find_one({"project_uid": project_uid})
 
+    def get_project_by_project_name(self, project_name: str) -> Optional[Dict]:
+        """Get project by its unique ID"""
+        pattern = f"^{re.escape(project_name.strip())}$"
+        return self.collection.find_one({"project_name": {"$regex": pattern, "$options": "i"}})
+
     def get_projects_by_source(self, source: str) -> List[Dict]:
         """Get all projects that have data from a specific source"""
         return list(self.collection.find({f"sources.{source}": {"$exists": True}}))
@@ -347,6 +354,26 @@ class MasterProjectManager:
     def get_projects_by_category(self, category: str) -> List[Dict]:
         """Get all projects in a specific category"""
         return list(self.collection.find({"category": category}))
+
+    def get_projects_grouped_by_duplicate_ticker(self) -> List[Dict[str, Any]]:
+        """
+        Return full project docs grouped by duplicate ticker.
+        Example item: {"project_ticker": "GOLD", "count": 3, "projects": [ {...}, {...}, {...} ]}
+        """
+        pipeline = [
+            {"$match": {"project_ticker": {"$ne": None, "$ne": ""}}},
+            {
+                "$group": {
+                    "_id": "$project_ticker",
+                    "count": {"$sum": 1},
+                    "projects": {"$push": "$$ROOT"},
+                }
+            },
+            {"$match": {"count": {"$gt": 1}}},
+            {"$sort": {"count": -1, "_id": 1}},
+            {"$project": {"_id": 0, "project_ticker": "$_id", "count": 1, "projects": 1}},
+        ]
+        return list(self.collection.aggregate(pipeline, allowDiskUse=True))
 
     def get_project_stats(self) -> Dict:
         """Get database statistics"""
@@ -404,8 +431,18 @@ if __name__ == "__main__":
     manager = MasterProjectManager(get_mongodb_uri())
 
     # Usage example:
-    project_uid = manager.upsert_project(example_project, "coinmarketcap")
-    print(f"Project UID: {project_uid}")
+    # project_uid = manager.upsert_project(example_project, "coinmarketcap")
+    # print(f"Project UID: {project_uid}")
 
-    # stats = manager.get_project_stats()
-    # print(f"Database stats: {stats}")
+    stats = manager.get_project_stats()
+    print(f"Database stats: {stats}")
+
+    GALA = manager.get_project_by_project_name("GALA")
+    print(f"GALA stats: {GALA}")
+
+    duplicates = manager.get_projects_grouped_by_duplicate_ticker()
+    print(f"duplicates: {duplicates}")
+
+
+    # "38c75acb-399f-4f03-907b-2d81ce53108b"
+    # "df22aa71-e3fe-4243-a2b2-d84feb2e79e8"
