@@ -17,7 +17,7 @@ from scrapers.pages.cmc_pages import *
 from scrapers.cmc.data_extractor import enrich_project_with_details
 from scrapers.pages.cmc_pages import NEW_BUTTON
 from utils.project_enrichment import enrich_telegram_data, enrich_email_data
-from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver
+from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver, get_local_headless_web_driver
 
 
 def go_cmc_to_page(driver, qpage, timeout=10):
@@ -128,12 +128,9 @@ def handle_standard_cmc_table(driver, chrome_profile):
 
 
 def scrape_new_cmc_page(page_num:int, chrome_profile):
-    driver = get_local_web_driver()
+    driver = get_local_headless_web_driver()
     driver.get("https://coinmarketcap.com")
 
-    new_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, NEW_BUTTON)))
-    driver.execute_script("arguments[0].click();", new_button)
-    time.sleep(0.5)
 
     if page_num > 1:
         go_cmc_to_page(driver, page_num)
