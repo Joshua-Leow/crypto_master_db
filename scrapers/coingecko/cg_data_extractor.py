@@ -274,7 +274,7 @@ def enrich_project_with_details(driver, project):
             print(f"Missing exchanges via Selenium for {project.get('project_name', 'Unknown')}")
 
     except Exception as e:
-        print(f"Error connecting Selenium driver for {project.get('project_name', 'Unknown')}: {e}")
+        print(f"Error connecting Selenium driver for {project['sources']['coingecko']}: {e}")
 
     print(f"{project}")
     return project

@@ -65,7 +65,7 @@ def get_local_headless_web_driver():
                              "(KHTML, like Gecko) Chrome/125.0.6422.141 Safari/537.36") #required for X (Twitter)
 
         driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(10)
+        driver.set_page_load_timeout(20)
         driver.implicitly_wait(int(10))
 
         return driver
