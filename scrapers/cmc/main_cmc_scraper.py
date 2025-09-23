@@ -142,4 +142,4 @@ def scrape_new_cmc_page(page_num:int, chrome_profile):
     projects = handle_standard_cmc_table(driver, chrome_profile)
     driver.quit()
     time.sleep(1)
-    print(projects)
+    # print(projects)

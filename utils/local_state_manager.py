@@ -62,7 +62,7 @@ def _read_state(path: str) -> Dict[str, object]:
                     data[a] = 0.0
             return data
     except Exception as e:
-        logger.warning("Failed to read state %s: %s. Reinitializing.", path, e)
+        print("Failed to read state %s: %s. Reinitializing.", path, e)
         return {a: 0.0 for a in ACCOUNTS}
 
 
@@ -92,7 +92,7 @@ def _file_lock(path: str, timeout: float = 5.0):
             break
         except FileExistsError:
             if time.time() - start > timeout:
-                logger.warning("Lock timeout on %s. Proceeding without exclusive lock.", lock_path)
+                print("Lock timeout on %s. Proceeding without exclusive lock.", lock_path)
                 break
             time.sleep(0.05)
     try:
@@ -130,12 +130,12 @@ def allocation_account(profile_name: str) -> Optional[str]:
     if not available:
         # Log shortest remaining wait to aid scheduling
         remaining = min(max(0.0, COOLDOWN_SECONDS - s[2]) for s in stats)
-        logger.info("No account available for %s. Wait ~%.0f seconds.", profile_name, remaining)
+        print("No account available for %s. Wait ~%.0f seconds.", profile_name, remaining)
         return None
 
     # Choose the one with the oldest last_used (i.e., smallest last timestamp)
     selected = min(available, key=lambda t: t[1])[0]
-    logger.info("Selected %s for %s", selected, profile_name)
+    print("Selected %s for %s", selected, profile_name)
     return selected
 
 
@@ -157,7 +157,7 @@ def set_local_account_last_join(profile_name: str, account_name: str) -> None:
             if a not in state:
                 state[a] = 0.0
         _atomic_write(path, state)
-    logger.info("Updated %s for %s", account_name, profile_name)
+    print("Updated %s for %s", account_name, profile_name)
 
 
 # Optional convenience utilities
