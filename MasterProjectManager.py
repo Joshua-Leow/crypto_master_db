@@ -469,11 +469,11 @@ if __name__ == "__main__":
     stats = manager.get_project_stats()
     print(f"Database stats: {stats}\n")
 
-    # GALA = manager.get_project_by_project_name("GALA")
-    # print(f"GALA stats: {GALA}\n")
+    BTC = manager.get_project_by_project_name("Ethereum")
+    print(f"BTC stats: {BTC}\n")
 
-    duplicates = manager.get_projects_grouped_by_duplicate_ticker()
-    print(f"duplicates: {duplicates}\n")
+    # duplicates = manager.get_projects_grouped_by_duplicate_ticker()
+    # print(f"duplicates: {duplicates}\n")
 
 
     # "38c75acb-399f-4f03-907b-2d81ce53108b"

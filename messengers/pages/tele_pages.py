@@ -14,6 +14,7 @@ CHAIN_REACH_AI_MESSAGE = "//strong[text()='outreach way easier in Web3']"
 # SafeGuard page
 TAP_TO_VERIFY_BUTTON = "(//div/div/a//span[contains(text(), 'verify')])[last()]"
 LAUNCH_SAFEGUARD_POPUP = "/html/body/div/div/div/button/span[text()='Launch']"
+START_SAFEGUARD_ONCE = "//div[contains(@class, 'active')]/div/div/div/button/span[text()='START']"
 SAFEGUARD_VERIFY_PORTAL_LINK = "(//div/div/button[span[contains(text(), 'VERIFY')]])[last()]"
 SAFEGUARD_LAUNCH_BUTTON = "/html/body/div[8]/div/div[2]/button[1]/span"
 LAUNCH_SAFEGUARD_BROWSER = "body > div.popup.popup-peer.popup-confirmation.active > div > div.popup-buttons > button:nth-child(1)"

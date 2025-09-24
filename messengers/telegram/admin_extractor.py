@@ -145,6 +145,17 @@ def handle_telegram_channel(driver, channel, chrome_profile):
         except:
             pass
 
+        try:
+            # Tap on "START" button to Start SafeGuard page
+            start_safeguard_once = WebDriverWait(driver, 2).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, START_SAFEGUARD_ONCE))
+            )
+            ActionChains(driver).move_to_element(start_safeguard_once).click().perform()
+            print(f'clicked "START" button in {channel}. Starting SafeGuard page...')
+            time.sleep(4)
+        except:
+            pass
+
         # 2. Tap on "VERIFY" button in SafeGuard page, to open portal
         safeguard_verify_portal_link = WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.XPATH, SAFEGUARD_VERIFY_PORTAL_LINK))
