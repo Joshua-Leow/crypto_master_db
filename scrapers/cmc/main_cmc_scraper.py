@@ -49,13 +49,15 @@ def go_cmc_to_page(driver, qpage, timeout=10):
         available_pages = sorted(page_map.keys())
         if qpage in available_pages:
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", page_map[qpage])
-            page_map[qpage].click()
+            driver.execute_script("arguments[0].click();", page_map[qpage])
+            # page_map[qpage].click()
             break
         else:
             # Closest match
             closest_page = min(available_pages, key=lambda x: abs(x - qpage))
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", page_map[closest_page])
-            page_map[closest_page].click()
+            driver.execute_script("arguments[0].click();", page_map[closest_page])
+            # page_map[closest_page].click()
 
 
 def scrape_standard_project_rows_from_table(driver):
@@ -82,12 +84,12 @@ def scrape_standard_project_rows_from_table(driver):
             try:
                 # TODO: make it dynamic to find the data from different links
                 source_link = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a")
-                # ticker = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > div > p")
-                # project_name = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > p")
+                ticker = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > div > p")
+                project_name = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > p")
 
                 results.append({
-                    # "project_name": project_name.text,
-                    # "project_ticker": ticker.text.upper(),
+                    "project_name": project_name.text,
+                    "project_ticker": ticker.text.upper(),
                     "sources": {"coinmarketcap": source_link.get_attribute("href")},
                 })
             except Exception as e:

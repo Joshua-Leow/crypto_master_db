@@ -326,7 +326,7 @@ def enrich_project_with_details(driver, project):
             project_name = extract_project_name(driver)
             if project_name: project["project_name"] = project_name
         except Exception as e:
-            print(f"Missing project_name via Selenium for {project["sources"]["coinmarketcap"]}")
+            print(f"Missing project_name via Selenium for {project['sources']['coinmarketcap']}")
 
         try:
             project_ticker = extract_project_ticker(driver)
