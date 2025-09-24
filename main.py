@@ -8,5 +8,5 @@ if __name__ == "__main__":
     #
     # for page_num in range(8, 10):
     print(f"starting scrape for page {page_num} with profile {chrome_profile}")
-    scrape_new_cmc_page(page_num, chrome_profile)
-    # scrape_cg_page(page_num, chrome_profile)
+    # scrape_new_cmc_page(page_num, chrome_profile)
+    scrape_cg_page(page_num, chrome_profile)

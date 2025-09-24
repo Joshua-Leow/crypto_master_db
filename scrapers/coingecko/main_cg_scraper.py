@@ -207,8 +207,7 @@ def get_project_links(driver):
     return projects
 
 
-def handle_standard_cg_table(driver, chrome_profile):
-    projects = get_project_links(driver)
+def handle_standard_cg_table(driver, chrome_profile, projects):
     if not projects:
         print("No projects found in table")
 
@@ -240,14 +239,22 @@ def handle_standard_cg_table(driver, chrome_profile):
 
 
 
-def scrape_cg_page(page_num: int, chrome_profile: str):
+def scrape_cg_page(page_num: int, chrome_profile: str, links=None):
     """Placeholder for CoinGecko scraping."""
-    driver = get_local_web_driver()
+    driver = get_local_headless_web_driver()
     driver.get("https://coingecko.com")
-    if page_num > 1:
-        go_cg_to_page(driver, page_num)
-    time.sleep(1)
 
-    projects = handle_standard_cg_table(driver, chrome_profile)
+    if links:
+        projects = []
+        for link in links:
+            project = {"sources": {"coingecko": link}}
+            projects.append(project)
+    else:
+        if page_num > 1:
+            go_cg_to_page(driver, page_num)
+        time.sleep(1)
+        projects = get_project_links(driver)
+
+    handle_standard_cg_table(driver, chrome_profile, projects)
     driver.quit()
-
+    time.sleep(1)
