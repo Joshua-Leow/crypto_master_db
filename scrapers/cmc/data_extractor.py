@@ -323,14 +323,16 @@ def enrich_project_with_details(driver, project):
         driver.get(project["sources"]["coinmarketcap"])
 
         try:
-            project_name = extract_project_name(driver)
-            if project_name: project["project_name"] = project_name
+            if project.get("project_name") is None:
+                project_name = extract_project_name(driver)
+                if project_name: project["project_name"] = project_name
         except Exception as e:
             print(f"Missing project_name via Selenium for {project['sources']['coinmarketcap']}")
 
         try:
-            project_ticker = extract_project_ticker(driver)
-            if project_ticker: project["project_ticker"] = project_ticker
+            if project.get("project_ticker") is None:
+                project_ticker = extract_project_ticker(driver)
+                if project_ticker: project["project_ticker"] = project_ticker
         except Exception as e:
             print(f"Missing project_ticker via Selenium for {project.get('project_name', 'Unknown')}")
 
