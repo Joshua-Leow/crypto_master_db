@@ -241,7 +241,7 @@ def handle_standard_cg_table(driver, chrome_profile, projects):
 
 def scrape_cg_page(page_num: int, chrome_profile: str, links=None):
     """Placeholder for CoinGecko scraping."""
-    driver = get_local_headless_web_driver()
+    driver = get_local_web_driver()
     driver.get("https://coingecko.com")
 
     if links:
