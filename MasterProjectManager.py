@@ -25,14 +25,14 @@ class MasterProjectManager:
 
         # Source priority list (index 0 = highest priority)
         self.source_priority = [
-            "coinmarketcap",
             "coingecko",
+            "coinmarketcap",
             "dextools",
             "dexscreener",
             "birdeye"
         ]
 
-        self._setup_indexes()
+        # self._setup_indexes()
 
     def _setup_indexes(self):
         """Setup MongoDB indexes for optimal performance"""
