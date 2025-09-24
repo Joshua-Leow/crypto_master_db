@@ -30,6 +30,8 @@ CMC_RANK_TEXT = "#section-coin-overview > div.sc-65e7f566-0.gLzlll > h1 > div.Ba
 
 IMPORTANT_TEXT = "#__next > div.sc-f9c982a5-1.bVsWPX.global-layout-v2 > div > div.cmc-body-wrapper > div > div > div.sc-65e7f566-0.ljtNVi.notice-container > section > div > div > span"
 
+PROJECT_NAME_TEXT = "//span[@data-role='coin-name']"
+PROJECT_TICKER_TEXT = "//span[@data-role='coin-symbol']"
 MARKET_CAP_TEXT = "//div[translate(normalize-space(text()), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = 'market cap']/ancestor::dt/following-sibling::dd//span[contains(text(), '$')]"
 FDV_TEXT = "//div[translate(normalize-space(text()), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = 'fdv']/ancestor::dt/following-sibling::dd//span[contains(text(), '$')]"
 TWENTYFOUR_HR_VOL_TEXT = "#section-coin-stats > div > div > dl > div:nth-child(2) > div > dd > div > div.CoinMetrics_overflow-content__tlFu7 > div > span"

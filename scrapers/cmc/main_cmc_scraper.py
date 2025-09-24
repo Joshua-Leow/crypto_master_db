@@ -82,12 +82,12 @@ def scrape_standard_project_rows_from_table(driver):
             try:
                 # TODO: make it dynamic to find the data from different links
                 source_link = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a")
-                ticker = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > div > p")
-                project_name = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > p")
+                # ticker = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > div > p")
+                # project_name = tr.find_element(By.CSS_SELECTOR, "td:nth-child(3) > div > a > span > div > div > p")
 
                 results.append({
-                    "project_name": project_name.text,
-                    "project_ticker": ticker.text.upper(),
+                    # "project_name": project_name.text,
+                    # "project_ticker": ticker.text.upper(),
                     "sources": {"coinmarketcap": source_link.get_attribute("href")},
                 })
             except Exception as e:
@@ -98,9 +98,7 @@ def scrape_standard_project_rows_from_table(driver):
 
     return results
 
-
-def handle_standard_cmc_table(driver, chrome_profile):
-    projects = scrape_standard_project_rows_from_table(driver)
+def handle_standard_cmc_table(driver, chrome_profile, projects):
     if not projects:
         print("No projects found in table")
         return []
@@ -110,8 +108,8 @@ def handle_standard_cmc_table(driver, chrome_profile):
     _reset_to_telegram_main(driver2)
     manager = MasterProjectManager(get_mongodb_uri())
 
+    enriched_projects = []
     try:
-        enriched_projects = []
         # for i, project in enumerate(projects[70:]):   # for testing purposes
         for i, project in enumerate(projects):
             print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
@@ -126,21 +124,25 @@ def handle_standard_cmc_table(driver, chrome_profile):
             project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
     finally:
         driver2.quit()
+        print(f"Successfully scraped {len(enriched_projects)} projects")
+        return enriched_projects
 
-    print(f"Successfully scraped {len(enriched_projects)} projects")
-    return enriched_projects
 
-
-def scrape_new_cmc_page(page_num:int, chrome_profile):
+def scrape_new_cmc_page(page_num:int, chrome_profile, links=None):
     driver = get_local_headless_web_driver()
     driver.get("https://coinmarketcap.com")
 
+    if links:
+        projects = []
+        for link in links:
+            project = {"sources": {"coinmarketcap": link}}
+            projects.append(project)
+    else:
+        if page_num > 1:
+            go_cmc_to_page(driver, page_num)
+        time.sleep(2.5)
+        projects = scrape_standard_project_rows_from_table(driver)
 
-    if page_num > 1:
-        go_cmc_to_page(driver, page_num)
-    time.sleep(2.5)
-
-    projects = handle_standard_cmc_table(driver, chrome_profile)
+    handle_standard_cmc_table(driver, chrome_profile, projects)
     driver.quit()
     time.sleep(1)
-    # print(projects)

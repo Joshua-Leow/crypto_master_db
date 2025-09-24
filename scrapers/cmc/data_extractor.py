@@ -12,7 +12,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
 
 from scrapers.pages.cmc_pages import MARKET_CAP_TEXT, TAGS, TAGS_SECTION, TAGS_MODAL, TAGS_MODAL_2, \
-    EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT, ABOUT_TEXT
+    EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT, ABOUT_TEXT, \
+    PROJECT_NAME_TEXT, PROJECT_TICKER_TEXT
 
 from utils.text_utils import replace_string_at_index
 
@@ -48,6 +49,48 @@ def extract_categories(driver):
     time.sleep(0.3)
     categories = [el.text.strip() for el in tag_elements if el.text.strip()]
     return categories
+
+
+def extract_project_name(driver):
+    """
+    Extract project_name text from the project page.
+
+    Args:
+        driver: Selenium WebDriver instance
+
+    Returns:
+        list[str]: List of href links found
+    """
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, PROJECT_NAME_TEXT))
+        )
+        elem = driver.find_element(By.XPATH, PROJECT_NAME_TEXT)
+        return elem.text
+    except Exception as e:
+        print(f"Error extracting project name: {e}")
+    return None
+
+
+def extract_project_ticker(driver):
+    """
+    Extract project_ticker text from the project page.
+
+    Args:
+        driver: Selenium WebDriver instance
+
+    Returns:
+        list[str]: List of href links found
+    """
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, PROJECT_TICKER_TEXT))
+        )
+        elem = driver.find_element(By.XPATH, PROJECT_TICKER_TEXT)
+        return elem.text.upper()
+    except Exception as e:
+        print(f"Error extracting project ticker: {e}")
+    return None
 
 
 def extract_exchanges(driver, timeout=5, pause=1):
@@ -278,6 +321,18 @@ def enrich_project_with_details(driver, project):
 
     try:
         driver.get(project["sources"]["coinmarketcap"])
+
+        try:
+            project_name = extract_project_name(driver)
+            if project_name: project["project_name"] = project_name
+        except Exception as e:
+            print(f"Missing project_name via Selenium for {project["sources"]["coinmarketcap"]}")
+
+        try:
+            project_ticker = extract_project_ticker(driver)
+            if project_ticker: project["project_ticker"] = project_ticker
+        except Exception as e:
+            print(f"Missing project_ticker via Selenium for {project.get('project_name', 'Unknown')}")
 
         try:
             exchanges = extract_exchanges(driver)
