@@ -128,7 +128,7 @@ def handle_standard_cmc_table(driver, chrome_profile, projects):
         return enriched_projects
 
 
-def scrape_new_cmc_page(page_num:int, chrome_profile, links=None):
+def scrape_cmc_page(page_num:int, chrome_profile, links=None):
     driver = get_local_headless_web_driver()
     driver.get("https://coinmarketcap.com")
 
