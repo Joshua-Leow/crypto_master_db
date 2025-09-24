@@ -110,21 +110,22 @@ def handle_standard_cmc_table(driver, chrome_profile):
     _reset_to_telegram_main(driver2)
     manager = MasterProjectManager(get_mongodb_uri())
 
-    enriched_projects = []
-    # for i, project in enumerate(projects[:10]):   # for testing purposes
-    for i, project in enumerate(projects):
-        print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
-        enriched_project = enrich_project_with_details(driver, project)
-        enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
-        enriched_project.update(enrich_email_data(enriched_project))
+    try:
+        enriched_projects = []
+        # for i, project in enumerate(projects[70:]):   # for testing purposes
+        for i, project in enumerate(projects):
+            print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
+            enriched_project = enrich_project_with_details(driver, project)
+            enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
+            enriched_project.update(enrich_email_data(enriched_project))
 
-        if enriched_project.get('project_name', None) is None or enriched_project.get('project_ticker', None) is None:
-            print(f"[ERROR] Project {project['sources']['coinmarketcap']} not enriched...")
-            continue
-        enriched_projects.append(enriched_project)
-        project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
-
-    driver2.quit()
+            if not enriched_project.get("project_name") or not enriched_project.get("project_ticker"):
+                print(f"[ERROR] Project {project['sources']['coinmarketcap']} not enriched...")
+                continue
+            enriched_projects.append(enriched_project)
+            project_uid = manager.upsert_project(enriched_project, "coinmarketcap")
+    finally:
+        driver2.quit()
 
     print(f"Successfully scraped {len(enriched_projects)} projects")
     return enriched_projects

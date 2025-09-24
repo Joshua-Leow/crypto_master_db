@@ -11,7 +11,7 @@ from config.private import get_mongodb_uri
 
 
 class MasterProjectManager:
-    def __init__(self, connection_string: str, database_name: str = "master_projects"):
+    def __init__(self, connection_string: str, database_name: str = "chainreachai"):
         """
         Initialize the MasterProjectManager with MongoDB connection
 
@@ -355,13 +355,25 @@ class MasterProjectManager:
         """Get all projects in a specific category"""
         return list(self.collection.find({"category": category}))
 
-    def get_projects_grouped_by_duplicate_ticker(self) -> List[Dict[str, Any]]:
+    from typing import Any, Dict, List, Optional
+
+    def get_projects_grouped_by_duplicate_ticker(
+            self, exclude_fields: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
         """
-        Return full project docs grouped by duplicate ticker.
-        Example item: {"project_ticker": "GOLD", "count": 3, "projects": [ {...}, {...}, {...} ]}
+        Return full project docs grouped by duplicate ticker, excluding large fields.
+        Example: {"project_ticker": "GOLD", "count": 3, "projects": [ {...}, ... ]}
         """
-        pipeline = [
+        exclude_fields = exclude_fields or ["about", "exchanges", "category", "telegram_admins"]
+        pipeline: List[Dict[str, Any]] = [
             {"$match": {"project_ticker": {"$ne": None, "$ne": ""}}},
+        ]
+
+        # Exclude fields from each document before grouping
+        if exclude_fields:
+            pipeline.append({"$project": {f: 0 for f in exclude_fields}})
+
+        pipeline += [
             {
                 "$group": {
                     "_id": "$project_ticker",
@@ -374,6 +386,26 @@ class MasterProjectManager:
             {"$project": {"_id": 0, "project_ticker": "$_id", "count": 1, "projects": 1}},
         ]
         return list(self.collection.aggregate(pipeline, allowDiskUse=True))
+
+    # def get_projects_grouped_by_duplicate_ticker(self) -> List[Dict[str, Any]]:
+    #     """
+    #     Return full project docs grouped by duplicate ticker.
+    #     Example item: {"project_ticker": "GOLD", "count": 3, "projects": [ {...}, {...}, {...} ]}
+    #     """
+    #     pipeline = [
+    #         {"$match": {"project_ticker": {"$ne": None, "$ne": ""}}},
+    #         {
+    #             "$group": {
+    #                 "_id": "$project_ticker",
+    #                 "count": {"$sum": 1},
+    #                 "projects": {"$push": "$$ROOT"},
+    #             }
+    #         },
+    #         {"$match": {"count": {"$gt": 1}}},
+    #         {"$sort": {"count": -1, "_id": 1}},
+    #         {"$project": {"_id": 0, "project_ticker": "$_id", "count": 1, "projects": 1}},
+    #     ]
+    #     return list(self.collection.aggregate(pipeline, allowDiskUse=True))
 
     def get_project_stats(self) -> Dict:
         """Get database statistics"""
@@ -435,13 +467,13 @@ if __name__ == "__main__":
     # print(f"Project UID: {project_uid}")
 
     stats = manager.get_project_stats()
-    print(f"Database stats: {stats}")
+    print(f"Database stats: {stats}\n")
 
-    GALA = manager.get_project_by_project_name("GALA")
-    print(f"GALA stats: {GALA}")
+    # GALA = manager.get_project_by_project_name("GALA")
+    # print(f"GALA stats: {GALA}\n")
 
     duplicates = manager.get_projects_grouped_by_duplicate_ticker()
-    print(f"duplicates: {duplicates}")
+    print(f"duplicates: {duplicates}\n")
 
 
     # "38c75acb-399f-4f03-907b-2d81ce53108b"
