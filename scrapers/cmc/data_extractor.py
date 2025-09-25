@@ -408,12 +408,35 @@ def enrich_project_with_details(driver, project):
 
         try:
             cats, nets = extract_categories(driver)
-            for v in nets: _add_unique_ci(project.setdefault("network", []), v)
-            for v in cats: _add_unique_ci(project.setdefault("category", []), v)
-            project["network"] = sorted({v.title() for v in project["network"]})
-            project["category"] = sorted({v.title() for v in project["category"]})
+            if nets:
+                for v in nets: _add_unique_ci(project.setdefault("network", []), v)
+                project["network"] = sorted({(v or "").title() for v in project.get("network", []) if isinstance(v, str)})
+            if cats:
+                for v in cats: _add_unique_ci(project.setdefault("category", []), v)
+                project["category"] = sorted({(v or "").title() for v in project.get("category", []) if isinstance(v, str)})
         except Exception as e:
-            print(f"Missing categories via Selenium for {project.get('project_name', 'Unknown')}")
+            # import logging, traceback, sys, pprint as pp
+            # logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(message)s")
+            #
+            # def _exc_dump(msg: str, **ctx):
+            #     et, ev, tb = sys.exc_info()
+            #     logging.error("%s: %s: %s", msg, et.__name__ if et else "Exception", ev)
+            #     for k, v in ctx.items():
+            #         logging.error("  %s=%s", k, v)
+            #     traceback.print_exc()
+            #
+            # _exc_dump(
+            #     "Missing categories via Selenium",
+            #     project_name=project.get("project_name"),
+            #     has_network=isinstance(project.get("network"), list),
+            #     has_category=isinstance(project.get("category"), list),
+            #     nets_len=("n/a" if "nets" not in locals() else len(nets)),
+            #     cats_len=("n/a" if "cats" not in locals() else len(cats)),
+            #     project_keys=sorted(project.keys()),
+            #     sample_network=(project.get("network")[:5] if isinstance(project.get("network"), list) else None),
+            #     sample_category=(project.get("category")[:5] if isinstance(project.get("category"), list) else None),
+            # )
+            print(f"Missing categories via Selenium for {project.get('project_name', 'Unknown')}\n{e}")
 
     except Exception as e:
         print(f"Error connecting Selenium driver for {project.get('project_name', 'Unknown')}: {e}")

@@ -44,9 +44,9 @@ def extract_market_cap(driver):
     """
     try:
         WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located((By.XPATH, MARKET_CAP_TEXT))
+            EC.visibility_of_element_located((By.CSS_SELECTOR, MARKET_CAP_TEXT))
         )
-        elem = driver.find_element(By.XPATH, MARKET_CAP_TEXT)
+        elem = driver.find_element(By.CSS_SELECTOR, MARKET_CAP_TEXT)
         raw = elem.text
         market_cap = parse_dollar_amount(raw)
         if market_cap > 0: return market_cap
@@ -123,8 +123,6 @@ def get_project_info_section(driver, project: Dict) -> Dict:
         print(f"Failed to get all_socials\n{e}")
 
     # Ensure arrays
-    if not isinstance(project.get("network"), list):
-        project["network"] = []
     if not isinstance(project.get("category"), list):
         project["category"] = []
 
@@ -150,9 +148,9 @@ def get_project_info_section(driver, project: Dict) -> Dict:
 
             for href in chain_hrefs:
                 slug = _slug_from_categories_url(href)
-                if not slug:
-                    continue
-                name = _normalize_name(slug)
+                if not slug: continue
+                if not isinstance(project.get("network"), list): project["network"] = []
+                name = _strip_ecosystem(slug)
                 _add_unique_ci(project["network"], name)
     except Exception as e:
         print(f"Failed to get more chains\n{e}")
@@ -175,7 +173,7 @@ def get_project_info_section(driver, project: Dict) -> Dict:
                 category_hrefs += [el.get_attribute("href") for el in more_unfiltered_categories if el.get_attribute("href")]
                 more_info_button.click()
             except Exception as e:
-                print(f"more category info button missing\n{e}")
+                print(f"more category info button missing")
 
             for href in category_hrefs:
                 slug = _slug_from_categories_url(href)
@@ -185,16 +183,23 @@ def get_project_info_section(driver, project: Dict) -> Dict:
                 if _get_ecosystem_regex().search(raw):
                     moved = _strip_ecosystem(raw)
                     if moved:
+                        if not isinstance(project.get("network"), list): project["network"] = []
                         _add_unique_ci(project["network"], moved)
                 else:
+                    if not isinstance(project.get("category"), list): project["category"] = []
                     _add_unique_ci(project["category"], raw)
-
-        # Final per-doc normalization and uniqueness guarantees
-        project["network"]  = sorted({v.title() for v in project["network"] if isinstance(v, str)})
-        project["category"] = sorted({v.title() for v in project["category"] if isinstance(v, str)})
-
     except Exception as e:
         print(f"Failed to get more categories\n{e}")
+
+    try:
+        # Final per-doc normalization and uniqueness guarantees
+        if isinstance(project.get("network"), list):
+            project["network"]  = sorted({v.title() for v in project["network"] if isinstance(v, str)})
+        if isinstance(project.get("category"), list):
+            project["category"] = sorted({v.title() for v in project["category"] if isinstance(v, str)})
+
+    except Exception as e:
+        print(f"Failed to sort network and categories\n{e}")
 
     return project
 

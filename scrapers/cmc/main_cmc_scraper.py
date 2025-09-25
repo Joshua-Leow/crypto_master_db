@@ -118,6 +118,7 @@ def handle_standard_cmc_table(driver, chrome_profile, projects):
             enriched_project = enrich_project_with_details(driver, project)
             enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
             enriched_project.update(enrich_email_data(enriched_project))
+            print(enriched_project)
 
             if not enriched_project.get("project_name") or not enriched_project.get("project_ticker"):
                 print(f"[ERROR] Project {project['sources']['coinmarketcap']} not enriched...")
