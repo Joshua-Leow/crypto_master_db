@@ -242,7 +242,7 @@ def handle_standard_cg_table(driver, chrome_profile, projects):
 def scrape_cg_page(page_num: int, chrome_profile: str, links=None):
     """Placeholder for CoinGecko scraping."""
     driver = get_local_web_driver()
-    driver.get("https://coingecko.com")
+    # driver.get("https://coingecko.com")
 
     if links:
         projects = []
@@ -251,7 +251,10 @@ def scrape_cg_page(page_num: int, chrome_profile: str, links=None):
             projects.append(project)
     else:
         if page_num > 1:
-            go_cg_to_page(driver, page_num)
+            driver.get("https://coingecko.com/?page=" + str(page_num) + "")
+            # go_cg_to_page(driver, page_num)
+        else:
+            driver.get("https://coingecko.com")
         time.sleep(1)
         projects = get_project_links(driver)
 

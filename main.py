@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # print(f"starting scrape for page {page_num} with profile {chrome_profile}")
     # scrape_cmc_page(page_num, chrome_profile)
 
-    # page_num = int(input("Enter page number (1-189)"))
-    for page_num in range(7, 12):
-        print(f"starting scrape for page {page_num} with profile {chrome_profile}")
-        scrape_cg_page(page_num, chrome_profile)
+    # for page_num in range(8, 13):
+    page_num = int(input("Enter page number (1-189)"))
+    print(f"starting scrape for page {page_num} with profile {chrome_profile}")
+    scrape_cg_page(page_num, chrome_profile)
