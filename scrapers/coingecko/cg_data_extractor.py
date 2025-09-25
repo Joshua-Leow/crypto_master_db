@@ -16,7 +16,7 @@ from scrapers.pages.coingecko_pages import COIN_NAME_TEXT, COIN_SYMBOL_TEXT, MAR
     INFO_TABLE_KEYS, WEBSITE_LINK, SOCIALS_LINKS, INFO_SECTION_LINKS, CHAINS_INFO_LINKS, MORE_INFO_BUTTON, \
     CATEGORY_INFO_LINKS, ABOUT_MORE_BUTTON, ABOUT_TEXT, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, \
     NEXT_PAGE_BUTTON, NAVIGATION_NUMBERS, EXCHANGE_LINK__14
-from utils.text_utils import replace_string_at_index
+from utils.text_utils import replace_string_at_index, parse_dollar_amount
 
 
 def get_coin_symbol(driver):
@@ -29,6 +29,30 @@ def get_coin_symbol(driver):
         print(f"Failed at get_coin_symbol function. COIN_SYMBOL_TEXT not found.")
     # print(f"coin_symbol is: {coin_symbol}")
     return coin_symbol
+
+
+def extract_market_cap(driver):
+    """
+    Extract market cap text from the project page.
+
+    Args:
+        driver: Selenium WebDriver instance
+
+    Returns:
+        list[str]: List of href links found
+    """
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.XPATH, MARKET_CAP_TEXT))
+        )
+        elem = driver.find_element(By.XPATH, MARKET_CAP_TEXT)
+        raw = elem.text
+        market_cap = parse_dollar_amount(raw)
+        if market_cap > 0: return market_cap
+        else: return None
+    except Exception as e:
+        print(f"Error extracting market cap: {e}")
+    return None
 
 
 def get_project_info_section(driver, project:Dict):
@@ -230,7 +254,7 @@ def enrich_project_with_details(driver, project):
         dict: Enriched project data
     """
     try:
-        driver.get(project["sources"]["coingecko"])
+        driver.get(project['sources']['coingecko'])
 
         try:
             project_name = driver.find_element(By.CSS_SELECTOR, COIN_NAME_TEXT).text
@@ -250,7 +274,7 @@ def enrich_project_with_details(driver, project):
             print(f"Error getting project info section via Selenium for {project.get('project_name', 'Unknown')}: {e}")
 
         try:
-            market_cap = driver.find_element(By.CSS_SELECTOR, MARKET_CAP_TEXT).text
+            market_cap = extract_market_cap(driver)
             if market_cap: project["market_cap"] = market_cap
         except Exception as e:
             print(f"Missing mcap via Selenium for {project.get('project_name', 'Unknown')}")

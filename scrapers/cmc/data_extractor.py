@@ -15,7 +15,8 @@ from scrapers.pages.cmc_pages import MARKET_CAP_TEXT, TAGS, TAGS_SECTION, TAGS_M
     EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT, ABOUT_TEXT, \
     PROJECT_NAME_TEXT, PROJECT_TICKER_TEXT
 
-from utils.text_utils import replace_string_at_index
+from utils.text_utils import replace_string_at_index, parse_dollar_amount
+
 
 def extract_categories(driver):
     """
@@ -195,7 +196,7 @@ def extract_about_from_soup(soup):
     return about_notes
 
 
-def extract_market_cap_text(driver):
+def extract_market_cap(driver):
     """
     Extract market cap text from the project page.
 
@@ -210,7 +211,10 @@ def extract_market_cap_text(driver):
             EC.visibility_of_element_located((By.XPATH, MARKET_CAP_TEXT))
         )
         elem = driver.find_element(By.XPATH, MARKET_CAP_TEXT)
-        return elem.text
+        raw = elem.text
+        market_cap = parse_dollar_amount(raw)
+        if market_cap > 0: return market_cap
+        else: return None
     except Exception as e:
         print(f"Error extracting market cap: {e}")
     return None
@@ -230,7 +234,8 @@ def extract_fdv_text(driver):
             EC.visibility_of_element_located((By.XPATH, FDV_TEXT))
         )
         elem = driver.find_element(By.XPATH, FDV_TEXT)
-        return elem.text
+        raw = elem.text
+        return parse_dollar_amount(raw)
     except Exception as e:
         print(f"Error extracting market cap: {e}")
     return None
@@ -344,7 +349,7 @@ def enrich_project_with_details(driver, project):
 
         try:
             # get market cap
-            market_cap = extract_market_cap_text(driver)
+            market_cap = extract_market_cap(driver)
             if market_cap: project["market_cap"] = market_cap
         except Exception as e:
             print(f"Missing market cap via Selenium for {project.get('project_name', 'Unknown')}")

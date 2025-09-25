@@ -7,6 +7,33 @@ import re
 from typing import List
 
 
+def parse_dollar_amount(value: str) -> float | None:
+    """
+    Convert market cap string into float.
+    Examples:
+        "$249.67K" -> 249670.0
+        "$142,116,149" -> 142116149.0
+    """
+    SUFFIX_MULTIPLIERS = {
+        "K": 1e3,
+        "M": 1e6,
+        "B": 1e9,
+        "T": 1e12,
+    }
+
+    if not value: return None
+
+    v = value.strip().replace("$", "").replace(",", "")
+    m = re.match(r"^([\d\.]+)([KMBT]?)$", v, re.IGNORECASE)
+    if not m:
+        return None
+
+    num = float(m.group(1))
+    suffix = m.group(2).upper()
+    if suffix in SUFFIX_MULTIPLIERS:
+        num *= SUFFIX_MULTIPLIERS[suffix]
+    return num
+
 def replace_string_at_index(text, index=0, replacement=''):
     """
     Replace character at specific index in string.
