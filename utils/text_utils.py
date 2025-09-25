@@ -4,7 +4,53 @@ Text processing utility functions.
 """
 
 import re
-from typing import List
+from typing import List, Optional
+
+
+# category and network util
+
+def _get_ecosystem_regex():
+    return re.compile(r"\becosystem\b", re.IGNORECASE)
+
+def _collapse_ws(s: str) -> str:
+    return " ".join(s.split())
+
+def _normalize_name(s: str) -> str:
+    """
+    Hyphen->space, collapse whitespace, strip, Title Case.
+    """
+    s = s.replace("-", " ")
+    s = _collapse_ws(s).strip()
+    return s.title()
+
+def _strip_ecosystem(s: str) -> str:
+    """
+    Remove the word 'ecosystem' and re-normalize.
+    """
+    ECOS_RE = _get_ecosystem_regex()
+    x = ECOS_RE.sub("", s)
+    return _normalize_name(x)
+
+def _add_unique_ci(arr: List[str], value: str) -> None:
+    """
+    Append value if not already present (case-insensitive) in arr.
+    """
+    if not value:
+        return
+    lv = value.lower()
+    if all((v or "").lower() != lv for v in arr):
+        arr.append(value)
+
+def _slug_from_categories_url(url: str) -> Optional[str]:
+    """
+    Extract the <slug> part from .../categories/<slug>(/...) URLs.
+    """
+    if not url or "/categories/" not in url:
+        return None
+    part = url.split("/categories/")[-1]
+    slug = part.split("/", 1)[0]
+    return slug or None
+# end of category and network util
 
 
 def parse_dollar_amount(value: str) -> float | None:

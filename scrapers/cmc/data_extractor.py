@@ -3,6 +3,7 @@
 CMC data extraction functions.
 """
 import time
+from typing import List, Tuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -15,41 +16,58 @@ from scrapers.pages.cmc_pages import MARKET_CAP_TEXT, TAGS, TAGS_SECTION, TAGS_M
     EXCHANGE_LINK_12, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, NEXT_PAGE_BUTTON, FDV_TEXT, ABOUT_TEXT, \
     PROJECT_NAME_TEXT, PROJECT_TICKER_TEXT
 
-from utils.text_utils import replace_string_at_index, parse_dollar_amount
+from utils.text_utils import replace_string_at_index, parse_dollar_amount, _normalize_name, _get_ecosystem_regex, \
+    _strip_ecosystem, _add_unique_ci
 
 
-def extract_categories(driver):
+def extract_categories(driver) -> Tuple[List[str], List[str]]:
     """
-    Extract category tags from a crypto project page.
-    If more than 3 tags are shown, click 'Show all' and collect from modal.
-    Otherwise, collect tags directly from the visible section.
-
-    Args:
-        driver: Selenium WebDriver instance.
-
+    Extract tags, normalize, and split into (categories, networks).
+    - Converts hyphens to spaces, title-cases, de-duplicates case-insensitively.
+    - Any tag containing 'ecosystem' is moved to networks with 'ecosystem' removed.
     Returns:
-        list[str]: List of category tags.
+        (categories: list[str], networks: list[str])
     """
+    def _normalize_and_split(names: List[str]) -> Tuple[List[str], List[str]]:
+        cats: List[str] = []
+        nets: List[str] = []
+        for n in names:
+            n = _normalize_name(n)
+            if not n:
+                continue
+            if _get_ecosystem_regex().search(n):
+                m = _strip_ecosystem(n)
+                if m:
+                    _add_unique_ci(nets, m)
+            else:
+                _add_unique_ci(cats, n)
+        # Final dedupe + sort
+        cats = sorted({v.title() for v in cats})
+        nets = sorted({v.title() for v in nets})
+        return cats, nets
+
     time.sleep(0.5)
     tag_elements = driver.find_elements(By.XPATH, TAGS_SECTION)
 
+    # If a "Show all" button exists, click and collect from modal
     for el in tag_elements:
         if el.text.strip().lower() == "show all":
             driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
             driver.execute_script("arguments[0].click();", el)
             time.sleep(0.5)
-            # Wait for modal and extract tags
             modal_tags = driver.find_elements(By.XPATH, TAGS_MODAL)
             modal_tags_2 = driver.find_elements(By.XPATH, TAGS_MODAL_2)
             all_modal_tags = modal_tags + modal_tags_2
             time.sleep(0.3)
-            categories = [el.text.strip() for el in all_modal_tags if el.text.strip()]
-            return categories
+            names = [e.text.strip() for e in all_modal_tags if e.text.strip()]
+            return _normalize_and_split(names)
 
-    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", tag_elements[0])
+    # Else collect from visible section
+    if tag_elements:
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", tag_elements[0])
     time.sleep(0.3)
-    categories = [el.text.strip() for el in tag_elements if el.text.strip()]
-    return categories
+    names = [el.text.strip() for el in tag_elements if el.text.strip()]
+    return _normalize_and_split(names)
 
 
 def extract_project_name(driver):
@@ -389,8 +407,11 @@ def enrich_project_with_details(driver, project):
             print(f"Missing socials via Selenium for {project.get('project_name', 'Unknown')}")
 
         try:
-            categories = extract_categories(driver)
-            if categories: project["category"] = categories
+            cats, nets = extract_categories(driver)
+            for v in nets: _add_unique_ci(project.setdefault("network", []), v)
+            for v in cats: _add_unique_ci(project.setdefault("category", []), v)
+            project["network"] = sorted({v.title() for v in project["network"]})
+            project["category"] = sorted({v.title() for v in project["category"]})
         except Exception as e:
             print(f"Missing categories via Selenium for {project.get('project_name', 'Unknown')}")
 

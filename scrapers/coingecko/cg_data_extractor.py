@@ -16,7 +16,8 @@ from scrapers.pages.coingecko_pages import COIN_NAME_TEXT, COIN_SYMBOL_TEXT, MAR
     INFO_TABLE_KEYS, WEBSITE_LINK, SOCIALS_LINKS, INFO_SECTION_LINKS, CHAINS_INFO_LINKS, MORE_INFO_BUTTON, \
     CATEGORY_INFO_LINKS, ABOUT_MORE_BUTTON, ABOUT_TEXT, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, \
     NEXT_PAGE_BUTTON, NAVIGATION_NUMBERS, EXCHANGE_LINK__14
-from utils.text_utils import replace_string_at_index, parse_dollar_amount
+from utils.text_utils import replace_string_at_index, parse_dollar_amount, _slug_from_categories_url, _normalize_name, \
+    _add_unique_ci, _get_ecosystem_regex, _strip_ecosystem
 
 
 def get_coin_symbol(driver):
@@ -55,39 +56,42 @@ def extract_market_cap(driver):
     return None
 
 
-def get_project_info_section(driver, project:Dict):
+def get_project_info_section(driver, project: Dict) -> Dict:
     """
-    get project info section from project page and enrich project data
-    with website, socials, chains, categories
-
-    :param driver:
-    :param project:
-    :return: project dictionary
+    Get project info section and enrich `project` with website, socials, network, category.
+    - Networks come from the "Chains" block and from category items containing 'ecosystem'.
+    - Category items are normalized and de-duplicated.
     """
     website = community = chains = categories = None
     try:
         info_table_keys_elements = driver.find_elements(By.CSS_SELECTOR, INFO_TABLE_KEYS)
         info_table_keys = [elem.text for elem in info_table_keys_elements]
         for i, key in enumerate(info_table_keys):
-            if 'Website' in key: website = i
-            if 'Community' in key: community = i
-            if 'Chains' in key: chains = i
-            if 'Categories' in key: categories = i
-    except Exception as e: print(f"Failed to get info_table_keys\n{e}")
+            if "Website"   in key: website   = i
+            if "Community" in key: community = i
+            if "Chains"    in key: chains    = i
+            if "Categories" in key: categories = i
+    except Exception as e:
+        print(f"Failed to get info_table_keys\n{e}")
+
+    # Website
     try:
-        if website:
-            WEBSITE_LINK_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(website+1))
-            website = driver.find_element(By.CSS_SELECTOR, WEBSITE_LINK_TARGET).get_attribute('href')
+        if website is not None:
+            WEBSITE_LINK_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(website + 1))
+            website_url = driver.find_element(By.CSS_SELECTOR, WEBSITE_LINK_TARGET).get_attribute("href")
             if not isinstance(project.get("socials"), dict):
                 project["socials"] = {}
-            project["socials"].update({"website": website})
-    except Exception as e: print(f"Failed to get website\n{e}")
+            if website_url:
+                project["socials"]["website"] = website_url
+    except Exception as e:
+        print(f"Failed to get website\n{e}")
+
+    # Community / socials
     try:
-        if community:
-            SOCIAL_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(community+1))
+        if community is not None:
+            SOCIAL_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(community + 1))
             all_socials = driver.find_elements(By.CSS_SELECTOR, SOCIAL_LINKS_TARGET)
-            all_socials = [element.get_attribute('href') for element in all_socials]
-            all_socials = [href for href in all_socials if href]
+            all_socials = [el.get_attribute("href") for el in all_socials if el.get_attribute("href")]
             if all_socials:
                 link_field_map = {
                     "t.me": "telegram_link",
@@ -102,75 +106,95 @@ def get_project_info_section(driver, project:Dict):
                     "twitter": "twitter_link",
                     "x.com": "twitter_link",
                     "mailto:": "email_link",
-                    'github': 'github_link',
+                    "github": "github_link",
                 }
-
-                # Categorize and store the link
                 assigned_fields = set()
+                if not isinstance(project.get("socials"), dict):
+                    project["socials"] = {}
                 for link in all_socials:
                     for keyword, field in link_field_map.items():
                         if keyword in link and field not in assigned_fields:
-                            if link[:8] == 'mailto: ': link = link[8:]
-                            if not isinstance(project.get("socials"), dict):
-                                project["socials"] = {}
-                            project["socials"].update({field: link})
+                            if link.startswith("mailto: "):
+                                link = link[8:]
+                            project["socials"][field] = link
                             assigned_fields.add(field)
-                            break  # Stop checking more keywords for this link
-    except Exception as e: print(f"Failed to get all_socials\n{e}")
+                            break
+    except Exception as e:
+        print(f"Failed to get all_socials\n{e}")
+
+    # Ensure arrays
+    if not isinstance(project.get("network"), list):
+        project["network"] = []
+    if not isinstance(project.get("category"), list):
+        project["category"] = []
+
+    # Chains → network
     try:
-        if chains:
-            CHAIN_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(chains+1))
+        if chains is not None:
+            CHAIN_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(chains + 1))
             unfiltered_chains = driver.find_elements(By.CSS_SELECTOR, CHAIN_LINKS_TARGET)
-            unfiltered_chains = [element.get_attribute('href') for element in unfiltered_chains]
-            unfiltered_chains = [href for href in unfiltered_chains if href]
+            chain_hrefs = [el.get_attribute("href") for el in unfiltered_chains if el.get_attribute("href")]
 
             try:
-                MORE_INFO_BUTTON_TARGET = replace_string_at_index(MORE_INFO_BUTTON, -20, str(chains+1))
+                MORE_INFO_BUTTON_TARGET = replace_string_at_index(MORE_INFO_BUTTON, -20, str(chains + 1))
                 more_info_button = WebDriverWait(driver, 2).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, MORE_INFO_BUTTON_TARGET)))
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, MORE_INFO_BUTTON_TARGET))
+                )
                 more_info_button.click()
-                CHAIN_INFO_LINKS_TARGET = replace_string_at_index(CHAINS_INFO_LINKS, -36, str(chains+1))
-                more_unfiltered_chains = driver.find_elements(By.CSS_SELECTOR, CHAIN_INFO_LINKS_TARGET)
-                more_unfiltered_chains = [element.get_attribute('href') for element in more_unfiltered_chains]
-                more_unfiltered_chains = [href for href in more_unfiltered_chains if href]
-
-                unfiltered_chains.extend(more_unfiltered_chains)
+                CHAIN_INFO_LINKS_TARGET = replace_string_at_index(CHAINS_INFO_LINKS, -36, str(chains + 1))
+                more_unfiltered = driver.find_elements(By.CSS_SELECTOR, CHAIN_INFO_LINKS_TARGET)
+                chain_hrefs += [el.get_attribute("href") for el in more_unfiltered if el.get_attribute("href")]
                 more_info_button.click()
-            except Exception as e: print(f"more chain info button missing")
+            except Exception:
+                print("more chain info button missing")
 
-            if not isinstance(project.get("category"), dict):
-                project["category"] = []
-            for chain in unfiltered_chains:
-                if '/categories/' in chain:
-                    project["category"].append(chain.split('/categories/')[-1])
-    except Exception as e: print(f"Failed to get more chains\n{e}")
+            for href in chain_hrefs:
+                slug = _slug_from_categories_url(href)
+                if not slug:
+                    continue
+                name = _normalize_name(slug)
+                _add_unique_ci(project["network"], name)
+    except Exception as e:
+        print(f"Failed to get more chains\n{e}")
+
+    # Categories → category or network (if contains 'ecosystem')
     try:
-        if categories:
-            CATEGORIES_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(categories+1))
+        if categories is not None:
+            CATEGORIES_LINKS_TARGET = replace_string_at_index(INFO_SECTION_LINKS, -12, str(categories + 1))
             unfiltered_categories = driver.find_elements(By.CSS_SELECTOR, CATEGORIES_LINKS_TARGET)
-            unfiltered_categories = [element.get_attribute('href') for element in unfiltered_categories]
-            unfiltered_categories = [href for href in unfiltered_categories if href]
+            category_hrefs = [el.get_attribute("href") for el in unfiltered_categories if el.get_attribute("href")]
 
             try:
                 MORE_INFO_BUTTON_TARGET = replace_string_at_index(MORE_INFO_BUTTON, -20, str(categories + 1))
                 more_info_button = WebDriverWait(driver, 2).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, MORE_INFO_BUTTON_TARGET)))
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, MORE_INFO_BUTTON_TARGET))
+                )
                 more_info_button.click()
                 CATEGORY_INFO_LINKS_TARGET = replace_string_at_index(CATEGORY_INFO_LINKS, -42, str(categories + 1))
                 more_unfiltered_categories = driver.find_elements(By.CSS_SELECTOR, CATEGORY_INFO_LINKS_TARGET)
-                more_unfiltered_categories = [element.get_attribute('href') for element in more_unfiltered_categories]
-                more_unfiltered_categories = [href for href in more_unfiltered_categories if href]
-
-                unfiltered_categories.extend(more_unfiltered_categories)
+                category_hrefs += [el.get_attribute("href") for el in more_unfiltered_categories if el.get_attribute("href")]
                 more_info_button.click()
-            except Exception as e: print(f"more category info button missing\n{e}")
+            except Exception as e:
+                print(f"more category info button missing\n{e}")
 
-            if not isinstance(project.get("category"), dict):
-                project["category"] = []
-            for category in unfiltered_categories:
-                if '/categories/' in category:
-                    project["category"].append(category.split('/categories/')[-1])
-    except Exception as e: print(f"Failed to get more categories\n{e}")
+            for href in category_hrefs:
+                slug = _slug_from_categories_url(href)
+                if not slug:
+                    continue
+                raw = _normalize_name(slug)
+                if _get_ecosystem_regex().search(raw):
+                    moved = _strip_ecosystem(raw)
+                    if moved:
+                        _add_unique_ci(project["network"], moved)
+                else:
+                    _add_unique_ci(project["category"], raw)
+
+        # Final per-doc normalization and uniqueness guarantees
+        project["network"]  = sorted({v.title() for v in project["network"] if isinstance(v, str)})
+        project["category"] = sorted({v.title() for v in project["category"] if isinstance(v, str)})
+
+    except Exception as e:
+        print(f"Failed to get more categories\n{e}")
 
     return project
 

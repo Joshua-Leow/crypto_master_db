@@ -33,7 +33,7 @@ def _clean_item(s: str) -> str:
     s2 = SPACE_RE.sub(" ", s2).strip()
     return s2
 
-def _strip_ecosystem(s: str) -> str:
+def _easy_strip_ecosystem(s: str) -> str:
     """Remove the word 'ecosystem' and clean leftover spacing."""
     x = ECOS_RE.sub("", s)
     x = SPACE_RE.sub(" ", x).strip()
@@ -72,7 +72,7 @@ def split_category_into_keep_and_network(categories: Any) -> Tuple[List[str], Li
             continue
         cleaned = _clean_item(v)
         if ECOS_RE.search(cleaned):
-            net = _strip_ecosystem(cleaned)
+            net = _easy_strip_ecosystem(cleaned)
             if net:
                 moved.append(net)
         else:
