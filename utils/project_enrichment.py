@@ -99,9 +99,9 @@ def enrich_email_data(project: Dict) -> Dict:
 
         if emails:
             if ', ' in emails:
-                project['email_links'] = emails
+                project['socials']['email_links'] = emails
             else:
-                project['email_link'] = emails
+                project['socials']['email_link'] = emails
             print(f"✓ Found email(s) for {project.get('project_name', 'Unknown')}: {emails}")
         else:
             print(f"✗ No emails found for {project.get('project_name', 'Unknown')}")
