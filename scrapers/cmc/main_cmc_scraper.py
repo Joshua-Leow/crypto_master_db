@@ -16,7 +16,7 @@ from scrapers.pages.cmc_pages import *
 
 from scrapers.cmc.data_extractor import enrich_project_with_details
 from scrapers.pages.cmc_pages import NEW_BUTTON
-from utils.project_enrichment import enrich_telegram_data, enrich_email_data
+from utils.project_enrichment import enrich_telegram_data, enrich_data_from_website
 from utils.web_driver import get_dedicated_local_web_driver, get_local_web_driver, get_local_headless_web_driver
 
 
@@ -117,7 +117,7 @@ def handle_standard_cmc_table(driver, chrome_profile, projects):
             print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
             enriched_project = enrich_project_with_details(driver, project)
             enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
-            enriched_project.update(enrich_email_data(enriched_project))
+            enriched_project.update(enrich_data_from_website(enriched_project))
             print(enriched_project)
 
             if not enriched_project.get("project_name") or not enriched_project.get("project_ticker"):

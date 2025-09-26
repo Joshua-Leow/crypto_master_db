@@ -17,7 +17,7 @@ from scrapers.pages.cmc_pages import MARKET_CAP_TEXT, TAGS, TAGS_SECTION, TAGS_M
     PROJECT_NAME_TEXT, PROJECT_TICKER_TEXT
 
 from utils.text_utils import replace_string_at_index, parse_dollar_amount, _normalize_name, _get_ecosystem_regex, \
-    _strip_ecosystem, _add_unique_ci
+    _strip_ecosystem, _add_unique_ci, get_link_field_map
 
 
 def extract_categories(driver) -> Tuple[List[str], List[str]]:
@@ -376,21 +376,7 @@ def enrich_project_with_details(driver, project):
             # extract social links
             all_links = extract_all_social_links(driver)
             if all_links:
-                link_field_map = {
-                    "t.me": "telegram_link",
-                    "linkedin": "linkedin_link",
-                    "facebook": "facebook_link",
-                    "instagram": "instagram_link",
-                    "tiktok": "tiktok_link",
-                    "youtube": "youtube_link",
-                    "discord": "discord_link",
-                    "reddit": "reddit_link",
-                    "medium": "medium_link",
-                    "twitter": "twitter_link",
-                    "x.com": "twitter_link",
-                    "mailto:": "email_link",
-                    'github': 'github_link',
-                }
+                link_field_map = get_link_field_map()
 
                 # Categorize and store the link
                 assigned_fields = set()

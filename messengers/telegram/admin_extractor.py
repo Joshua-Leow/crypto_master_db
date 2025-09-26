@@ -348,7 +348,13 @@ def get_telegram_channel_admins_chat_type_router(chrome_profile, driver, channel
             # Handle Telegram channel
             admin_list = handle_telegram_channel(driver, channel, chrome_profile)
 
-        elif chat_type in ['private', 'group']:
+        elif chat_type == 'private':
+            admin_list = [{
+                "first_name:": channel,
+                "username:": channel
+            }]
+
+        elif chat_type in ['group']:
             print(f"Chat {channel} is a {chat_type}, admin extraction not applicable")
             return None
 

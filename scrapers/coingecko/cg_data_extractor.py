@@ -17,7 +17,7 @@ from scrapers.pages.coingecko_pages import COIN_NAME_TEXT, COIN_SYMBOL_TEXT, MAR
     CATEGORY_INFO_LINKS, ABOUT_MORE_BUTTON, ABOUT_TEXT, EXCHANGE_ROWS_OPTION, EXCHANGE_ROWS_100, \
     NEXT_PAGE_BUTTON, NAVIGATION_NUMBERS, EXCHANGE_LINK__14
 from utils.text_utils import replace_string_at_index, parse_dollar_amount, _slug_from_categories_url, _normalize_name, \
-    _add_unique_ci, _get_ecosystem_regex, _strip_ecosystem
+    _add_unique_ci, _get_ecosystem_regex, _strip_ecosystem, get_link_field_map
 
 
 def get_coin_symbol(driver):
@@ -93,21 +93,7 @@ def get_project_info_section(driver, project: Dict) -> Dict:
             all_socials = driver.find_elements(By.CSS_SELECTOR, SOCIAL_LINKS_TARGET)
             all_socials = [el.get_attribute("href") for el in all_socials if el.get_attribute("href")]
             if all_socials:
-                link_field_map = {
-                    "t.me": "telegram_link",
-                    "linkedin": "linkedin_link",
-                    "facebook": "facebook_link",
-                    "instagram": "instagram_link",
-                    "tiktok": "tiktok_link",
-                    "youtube": "youtube_link",
-                    "discord": "discord_link",
-                    "reddit": "reddit_link",
-                    "medium": "medium_link",
-                    "twitter": "twitter_link",
-                    "x.com": "twitter_link",
-                    "mailto:": "email_link",
-                    "github": "github_link",
-                }
+                link_field_map = get_link_field_map()
                 assigned_fields = set()
                 if not isinstance(project.get("socials"), dict):
                     project["socials"] = {}

@@ -4,11 +4,29 @@ Text processing utility functions.
 """
 
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict
 
+
+def get_link_field_map():
+    link_field_map: Dict[str, str] = {
+        "t.me": "telegram_link",
+        "linkedin": "linkedin_link",
+        "facebook": "facebook_link",
+        "instagram": "instagram_link",
+        "tiktok": "tiktok_link",
+        "youtube": "youtube_link",
+        "discord": "discord_link",
+        "reddit": "reddit_link",
+        "medium": "medium_link",
+        "twitter": "twitter_link",
+        "www.x.com": "twitter_link",
+        "/x.com": "twitter_link",
+        "mailto:": "email_link",
+        "github": "github_link",
+    }
+    return link_field_map
 
 # category and network util
-
 def _get_ecosystem_regex():
     return re.compile(r"\becosystem\b", re.IGNORECASE)
 
