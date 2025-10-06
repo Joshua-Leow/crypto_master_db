@@ -156,12 +156,42 @@
 ###################################################################################################################
 # file: enrichers/website_enricher.py
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 from telebot import TeleBot
 import random
 
 from messengers.telegram.admin_extractor import get_telegram_channel_admins_chat_type_router
-from utils.text_utils import get_telegram_group_from_link
+from utils.text_utils import get_telegram_group_from_link, get_link_field_map
+from typing import Iterable
+
+def _as_list_str(v: Any) -> list[str]:
+    """Coerce any value into list[str], stripped, drop empties."""
+    if isinstance(v, list):
+        return [s.strip() for s in v if isinstance(s, str) and s.strip()]
+    if isinstance(v, str):
+        s = v.strip()
+        return [s] if s else []
+    return []
+
+def _merge_unique_ci(*lists: Iterable[str]) -> list[str]:
+    """Merge lists, case-insensitive unique, keep first casing."""
+    out, seen = [], set()
+    for seq in lists:
+        for x in seq:
+            if not isinstance(x, str):
+                continue
+            k = x.strip().lower()
+            if k and k not in seen:
+                seen.add(k)
+                out.append(x.strip())
+    return out
+
+def _ensure_social_list(project: dict, key: str) -> list[str]:
+    """Ensure project['socials'][key] exists as list[str] and return it."""
+    socials = project.setdefault("socials", {})
+    lst = _as_list_str(socials.get(key))
+    socials[key] = lst
+    return lst
 
 
 def _choose_working_bot() -> Optional[TeleBot]:
@@ -198,19 +228,11 @@ def enrich_telegram_data(driver, project: Dict, chrome_profile) -> Dict:
     """
     Enrich project with Telegram admin data from ALL Telegram links.
     Aggregates into project['telegram_admins'] with de-duplication.
+    Requires socials.telegram_link to be a list[str] (this function enforces it).
     """
     try:
-        socials = project.get("socials", {})
-        tg_val = socials.get("telegram_link")
-
-        # Normalize telegram links to list
-        if isinstance(tg_val, list):
-            telegram_links = [v for v in tg_val if isinstance(v, str) and v.strip()]
-        elif isinstance(tg_val, str) and tg_val.strip():
-            telegram_links = [tg_val]
-        else:
-            return project
-
+        # normalize to list schema
+        telegram_links = _ensure_social_list(project, "telegram_link")
         if not telegram_links:
             return project
 
@@ -219,19 +241,22 @@ def enrich_telegram_data(driver, project: Dict, chrome_profile) -> Dict:
             print(f"✗ All Telegram bots failed for {project.get('project_name', 'Unknown')}")
             return project
 
-        # Start with any existing admins to keep idempotency across runs
-        aggregated = []
-        seen_keys = set()
-        existing = project.get("telegram_admins")
-        if isinstance(existing, list):
-            for adm in existing:
+        aggregated: list[dict] = []
+        seen_keys: set[Tuple] = set()
+
+        # keep existing admins idempotently
+        for adm in _as_list_str(None) or []:  # no-op placeholder; list kept below
+            pass
+        existing_admins = project.get("telegram_admins")
+        if isinstance(existing_admins, list):
+            for adm in existing_admins:
                 if isinstance(adm, dict):
                     k = _admin_key(adm)
                     if k not in seen_keys:
                         seen_keys.add(k)
                         aggregated.append(adm)
 
-        # Collect from each telegram link
+        # collect from each tg link
         for tg_link in telegram_links:
             try:
                 tele_group = get_telegram_group_from_link(tg_link)
@@ -243,7 +268,6 @@ def enrich_telegram_data(driver, project: Dict, chrome_profile) -> Dict:
                 admins = get_telegram_channel_admins_chat_type_router(
                     chrome_profile, driver, tele_group, bot
                 )
-
                 if not admins:
                     print(f"✗ No Telegram admins found for {tele_group}")
                     continue
@@ -256,7 +280,7 @@ def enrich_telegram_data(driver, project: Dict, chrome_profile) -> Dict:
                     if key in seen_keys:
                         continue
                     seen_keys.add(key)
-                    aggregated.append(admin)  # keep dict as-is
+                    aggregated.append(admin)
                     added += 1
 
                 print(f"✓ Added {added} new admins from {tele_group}")
@@ -780,67 +804,44 @@ def get_socials_from_website(
 def enrich_data_from_website(project: Dict) -> Dict:
     """
     Enriches project['socials'] with:
-      - email_link (list of emails)
+      - email_link (list[str])
       - social links per LINK_FIELD_MAP, canonicalized and de-duplicated
-    Preserves existing values, normalizes everything to lists.
+    Preserves existing values. All socials end as lists.
     """
     socials = project.setdefault("socials", {})
-    website = socials.get("website")
+
+    # website itself should be a list now
+    website_list = _ensure_social_list(project, "website")
+    website = website_list[0] if website_list else None
     if not website:
         print(f"✗ No website found for {project.get('project_name', 'Unknown')}")
         return project
 
     print(f"🔍 Scraping website for {project.get('project_name', 'Unknown')}: {website}")
 
-    # Emails: store as list only in email_link
-    existing_email_list = socials.get("email_link")
-    if not existing_email_list:
+    # Emails -> always list
+    existing_emails = _ensure_social_list(project, "email_link")
+    if not existing_emails:
         emails = get_emails_from_website(website, max_pages=MAX_TOTAL_PAGES, stop_after=10)
         if emails:
-            socials["email_link"] = emails  # list
-            print(f"✓ Found email(s): {', '.join(emails)}")
+            socials["email_link"] = _merge_unique_ci(existing_emails, emails)
+            print(f"✓ Found email(s): {', '.join(socials['email_link'])}")
         else:
             print("✗ No emails found")
-    else:
-        # ensure list type if a stray string was stored previously
-        if isinstance(existing_email_list, str):
-            socials["email_link"] = [existing_email_list]
 
-    # Socials from site
+    # Social links
     found_socials = get_socials_from_website(website, max_pages=MAX_TOTAL_PAGES)
-
-    # Merge with existing socials, normalize to lists
     for field, new_links in found_socials.items():
         if field == "email_link":
-            continue  # emails handled above
-
-        # normalize current to list
-        current = socials.get(field)
-        current_list: List[str]
-        if current is None:
-            current_list = []
-        elif isinstance(current, list):
-            current_list = current
-        elif isinstance(current, str):
-            current_list = [current]
-        else:
-            current_list = []
-
-        merged = current_list + new_links
-        merged = [u for u in merged if isinstance(u, str) and u.strip()]
-        # canonicalize and de-duplicate per rules
-        merged = _normalize_and_dedupe(field, merged)
-
-        socials[field] = merged  # always list
-
-    # Ensure all existing socials are lists even if not touched
-    for field, value in list(socials.items()):
-        if field == "email_link":
+            # already handled
             continue
-        if isinstance(value, str):
-            socials[field] = [value]
-        elif value is None:
-            socials[field] = []
+        current = _ensure_social_list(project, field)
+        merged = _merge_unique_ci(current, new_links)
+        socials[field] = _normalize_and_dedupe(field, merged)
+
+    # Ensure every existing social subfield is a list
+    for k, v in list(socials.items()):
+        socials[k] = _as_list_str(v)
 
     project["socials"] = socials
     return project

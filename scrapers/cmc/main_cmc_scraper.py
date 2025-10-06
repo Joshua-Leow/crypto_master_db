@@ -116,8 +116,8 @@ def handle_standard_cmc_table(driver, chrome_profile, projects):
         for i, project in enumerate(projects):
             print(f"Enriching project {i + 1}/{len(projects)}: {project.get('project_name', 'Unknown')}")
             enriched_project = enrich_project_with_details(driver, project)
-            enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
             enriched_project.update(enrich_data_from_website(enriched_project))
+            enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
             print(enriched_project)
 
             if not enriched_project.get("project_name") or not enriched_project.get("project_ticker"):

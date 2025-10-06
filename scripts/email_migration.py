@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-Migration: move top-level email_link/email_links into socials.email_link
-and remove the old fields.
+Migration: Normalize emails into socials.email_link (always a list).
+- Accepts top-level email_link (str|list) and email_links (str|list).
+- Merges with existing socials.email_link (if any).
+- Deduplicates case-insensitively, preserves original casing of first occurrence.
+- Removes top-level email_link and email_links.
 """
 
 from __future__ import annotations
+from typing import List, Dict, Any, Optional
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import BulkWriteError
-from typing import List, Dict, Any, Optional
 from bson import ObjectId
 
 from config.private import get_mongodb_uri
@@ -15,6 +18,29 @@ from config.private import get_mongodb_uri
 DB_NAME = "chainreachai"
 COLL_NAME = "projects"
 BATCH = 1000
+
+def _to_list(v: Any) -> List[str]:
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [str(x).strip() for x in v if isinstance(x, (str, bytes)) and str(x).strip()]
+    if isinstance(v, (str, bytes)):
+        s = str(v).strip()
+        return [s] if s else []
+    return []
+
+def _merge_unique_ci(existing: List[str], incoming: List[str]) -> List[str]:
+    seen = {}
+    # keep first-seen original casing
+    for x in existing + incoming:
+        if not isinstance(x, str):
+            continue
+        k = x.strip().lower()
+        if not k:
+            continue
+        if k not in seen:
+            seen[k] = x.strip()
+    return list(seen.values())
 
 def fetch_batch(coll, last_id: Optional[ObjectId]) -> List[Dict[str, Any]]:
     q = {"_id": {"$gt": last_id}} if last_id else {}
@@ -27,21 +53,23 @@ def fetch_batch(coll, last_id: Optional[ObjectId]) -> List[Dict[str, Any]]:
 def build_updates(docs: List[Dict[str, Any]]) -> List[UpdateOne]:
     ops: List[UpdateOne] = []
     for d in docs:
-        update: Dict[str, Any] = {}
         socials = d.get("socials") if isinstance(d.get("socials"), dict) else {}
-        modified = False
+        existing_list = _to_list(socials.get("email_link"))
+        top_email_link  = _to_list(d.get("email_link"))
+        top_email_links = _to_list(d.get("email_links"))
+        merged = _merge_unique_ci(existing_list, _merge_unique_ci(top_email_link, top_email_links))
 
-        # Collect a candidate email
-        email = d.get("email_link")
-        if not email and isinstance(d.get("email_links"), list) and d["email_links"]:
-            email = d["email_links"][0]  # pick first if list exists
+        update: Dict[str, Any] = {}
+        changed = False
 
-        if email and not socials.get("email_link"):
-            socials["email_link"] = email
-            update["$set"] = {"socials": socials}
-            modified = True
+        # set socials.email_link only if changed or if socials missing it
+        if merged != existing_list:
+            new_socials = dict(socials)
+            new_socials["email_link"] = merged
+            update["$set"] = {"socials": new_socials}
+            changed = True
 
-        # Always remove old keys if present
+        # always remove old fields if present
         unset_fields = {}
         if "email_link" in d:
             unset_fields["email_link"] = ""
@@ -49,9 +77,9 @@ def build_updates(docs: List[Dict[str, Any]]) -> List[UpdateOne]:
             unset_fields["email_links"] = ""
         if unset_fields:
             update.setdefault("$unset", {}).update(unset_fields)
-            modified = True
+            changed = True
 
-        if modified:
+        if changed:
             ops.append(UpdateOne({"_id": d["_id"]}, update))
     return ops
 

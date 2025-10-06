@@ -212,8 +212,8 @@ def handle_standard_cg_table(driver, chrome_profile, projects):
         print("No projects found in table")
 
     print(f"Scraped {len(projects)} projects, enriching data...")
-    # driver2 = get_dedicated_local_web_driver(chrome_profile)
-    # _reset_to_telegram_main(driver2)
+    driver2 = get_dedicated_local_web_driver(chrome_profile)
+    _reset_to_telegram_main(driver2)
     # manager = MasterProjectManager(get_mongodb_uri())
     #
     try:
@@ -222,8 +222,8 @@ def handle_standard_cg_table(driver, chrome_profile, projects):
         for i, project in enumerate(projects):
             print(f"Enriching project {i + 1}/{len(projects)}: {project.get('sources', 'coingecko')}")
             enriched_project = enrich_project_with_details(driver, project)
-            # enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
             enriched_project.update(enrich_data_from_website(enriched_project))
+            enriched_project.update(enrich_telegram_data(driver2, enriched_project, chrome_profile))
             print(enriched_project)
 
             if not enriched_project.get("project_name") or not enriched_project.get("project_ticker"):

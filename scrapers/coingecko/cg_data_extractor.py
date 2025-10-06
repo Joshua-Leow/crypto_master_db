@@ -82,7 +82,7 @@ def get_project_info_section(driver, project: Dict) -> Dict:
             if not isinstance(project.get("socials"), dict):
                 project["socials"] = {}
             if website_url:
-                project["socials"]["website"] = website_url
+                project["socials"]["website"] = [website_url]
     except Exception as e:
         print(f"Failed to get website\n{e}")
 
@@ -102,7 +102,7 @@ def get_project_info_section(driver, project: Dict) -> Dict:
                         if keyword in link and field not in assigned_fields:
                             if link.startswith("mailto: "):
                                 link = link[8:]
-                            project["socials"][field] = link
+                            project["socials"][field] = [link]
                             assigned_fields.add(field)
                             break
     except Exception as e:

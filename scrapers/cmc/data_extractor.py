@@ -323,7 +323,7 @@ def enrich_project_with_details(driver, project):
             website = extract_website_from_soup(soup)
             if not isinstance(project.get("socials"), dict):
                 project["socials"] = {}
-            project["socials"].update({"website": website})
+            project["socials"]["website"] = [website]
         except Exception as e:
             print(f"Missing website via BeatifulSoup for {project.get('project_name', 'Unknown')}")
 
@@ -386,7 +386,7 @@ def enrich_project_with_details(driver, project):
                             if link[:8] == 'mailto: ': link = link[8:]
                             if not isinstance(project.get("socials"), dict):
                                 project["socials"] = {}
-                            project["socials"].update({field: link})
+                            project["socials"][field] = [link]
                             assigned_fields.add(field)
                             break  # Stop checking more keywords for this link
         except Exception as e:
