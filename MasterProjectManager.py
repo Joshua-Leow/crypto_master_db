@@ -59,16 +59,14 @@ class MasterProjectManager:
 
         print("MongoDB indexes created successfully")
 
+    # ---------- tiny utilities ----------
     @staticmethod
     def _is_empty(value: Any) -> bool:
-        """Treat None, '', empty list/dict as empty. Numbers and False are not empty."""
         if value is None:
             return True
         if isinstance(value, str):
             return value.strip() == ""
-        if isinstance(value, dict):
-            return len(value) == 0
-        if isinstance(value, (list, tuple, set)):
+        if isinstance(value, (list, tuple, set, dict)):
             return len(value) == 0
         return False
 
@@ -80,12 +78,27 @@ class MasterProjectManager:
         except Exception:
             return f"{type(item).__name__}:{repr(item)}"
 
-    def _merge_lists(self, a: List[Any], b: List[Any], prefer_b: bool) -> List[Any]:
-        """
-        Union with order. If prefer_b, take b items first, then fill with a's uniques.
-        Works for primitives and list-of-dicts without a fixed identity.
-        """
-        base = b[:] + a[:] if prefer_b else a[:] + b[:]
+    @staticmethod
+    def _ensure_list(v: Any) -> List[Any]:
+        if v is None:
+            return []
+        return v if isinstance(v, list) else [v]
+
+    @staticmethod
+    def _norm_link(s: str) -> str:
+        s = str(s or "").strip()
+        return s.rstrip("/").lower()
+
+    def _prefer_scalar(self, a: Any, b: Any, prefer_b: bool) -> Any:
+        if self._is_empty(a) and not self._is_empty(b):
+            return deepcopy(b)
+        if self._is_empty(b):
+            return deepcopy(a)
+        return deepcopy(b) if prefer_b else deepcopy(a)
+
+    # ---------- field-specific helpers ----------
+    def _merge_simple_list(self, la: List[Any], lb: List[Any], prefer_b: bool) -> List[Any]:
+        base = (lb + la) if prefer_b else (la + lb)
         out, seen = [], set()
         for itm in base:
             sig = self._signature(itm)
@@ -94,69 +107,124 @@ class MasterProjectManager:
                 out.append(itm)
         return out
 
+    def _merge_socials(self, va: Dict[str, Any], vb: Dict[str, Any], prefer_b: bool) -> Dict[str, List[str]]:
+        va = va or {}
+        vb = vb or {}
+        keys = set(va) | set(vb)
+        res: Dict[str, List[str]] = {}
+        for field in keys:
+            la = self._ensure_list(va.get(field))
+            lb = self._ensure_list(vb.get(field))
+            ordered = (lb + la) if prefer_b else (la + lb)
+            out, seen = [], set()
+            for link in ordered:
+                key = self._norm_link(link)
+                if key and key not in seen:
+                    seen.add(key)
+                    out.append(link)
+            res[field] = out
+        return res
+
+    def _merge_admin_entry(self, a: Dict[str, Any], b: Dict[str, Any], prefer_b: bool) -> Dict[str, Any]:
+        """Flat merge of two admin dicts. Prefer non-empty from preferred side per key."""
+        keys = set(a) | set(b)
+        out: Dict[str, Any] = {}
+        for k in keys:
+            out[k] = self._prefer_scalar(a.get(k), b.get(k), prefer_b)
+        return out
+
+    def _merge_admins(self, la: List[Dict[str, Any]], lb: List[Dict[str, Any]], prefer_b: bool) -> List[Dict[str, Any]]:
+        la = la or []
+        lb = lb or []
+
+        def uname(d: Dict[str, Any]) -> str:
+            return str(d.get("username", "")).strip().lower()
+
+        # order: preferred side first
+        base = (lb + la) if prefer_b else (la + lb)
+        out: List[Dict[str, Any]] = []
+        idx: Dict[str, int] = {}
+        sig_seen: Set[str] = set()
+
+        for adm in base:
+            u = uname(adm)
+            if u:
+                if u not in idx:
+                    idx[u] = len(out)
+                    out.append(deepcopy(adm))
+                else:
+                    i = idx[u]
+                    out[i] = self._merge_admin_entry(out[i], adm, prefer_b)
+            else:
+                # no username -> dedupe by structural signature
+                sig = self._signature(adm)
+                if sig not in sig_seen:
+                    sig_seen.add(sig)
+                    out.append(deepcopy(adm))
+        return out
+
+    # ---------- deep merge (payload is always dict) ----------
     def _deep_merge(
             self,
-            a: Any,
-            b: Any,
+            a: Dict[str, Any],
+            b: Dict[str, Any],
             prefer_b: bool,
             protected_keys: Set[str],
-            path: Tuple[str, ...] = (),
-    ) -> Any:
+    ) -> Dict[str, Any]:
         """
-        Non-destructive deep merge.
-        - prefer_b=True: b wins for scalars when both non-empty.
-        - Dicts merge recursively.
-        - Lists union with de-duplication.
-        - Never overwrite non-empty with empty.
-        - Protected keys never change unless a is empty.
+        Non-destructive deep merge with clear per-field strategies.
+        Known keys:
+          - sources: ignored here (caller handles)
+          - socials: dict of lists -> union by normalized link, order by prefer_b
+          - market_cap/about: scalar preference
+          - category/exchanges/network: list union, order by prefer_b
+          - telegram_admins: list of dicts -> dedupe by username, merge entries
+          - other keys: scalar preference (same as market_cap/about)
+        Top-level protected_keys are never changed unless empty in 'a'.
         """
-        # Different types: pick b only if meaningful and preferred
-        if type(a) is not type(b):
-            return b if (prefer_b and not self._is_empty(b)) or self._is_empty(a) else a
+        result = deepcopy(a) if isinstance(a, dict) else {}
+        b = b or {}
 
-        # Dicts
-        if isinstance(a, dict):
-            result = deepcopy(a)
-            for k, v_b in b.items():
-                if k == "sources":
-                    # handled outside
-                    continue
-                v_a = result.get(k, None)
+        for k, v_b in b.items():
+            if k == "sources":
+                continue  # handled by caller
 
-                # protect certain top-level keys from mutation
-                if len(path) == 0 and k in protected_keys:
-                    if self._is_empty(v_a) and not self._is_empty(v_b):
-                        result[k] = deepcopy(v_b)
-                    # else keep existing
-                    continue
+            v_a = result.get(k)
 
-                if v_a is None:
-                    if not self._is_empty(v_b):
-                        result[k] = deepcopy(v_b)
-                    continue
+            # top-level protection
+            if k in protected_keys:
+                if self._is_empty(v_a) and not self._is_empty(v_b):
+                    result[k] = deepcopy(v_b)
+                continue
 
-                # both sides have a value
-                if isinstance(v_a, dict) and isinstance(v_b, dict):
-                    result[k] = self._deep_merge(v_a, v_b, prefer_b, protected_keys, path + (k,))
-                elif isinstance(v_a, list) and isinstance(v_b, list):
-                    result[k] = self._merge_lists(v_a, v_b, prefer_b)
-                else:
-                    # scalars or mismatched subtypes
-                    if self._is_empty(v_a) and not self._is_empty(v_b):
-                        result[k] = deepcopy(v_b)
-                    elif not self._is_empty(v_b) and prefer_b:
-                        result[k] = deepcopy(v_b)
-                    # else keep v_a
-            return result
+            # socials
+            if k == "socials":
+                result[k] = self._merge_socials(v_a or {}, v_b or {}, prefer_b)
+                continue
 
-        # Lists
-        if isinstance(a, list):
-            return self._merge_lists(a, b, prefer_b)
+            # list-union fields
+            if k in {"category", "exchanges", "network"}:
+                la = self._ensure_list(v_a)
+                lb = self._ensure_list(v_b)
+                result[k] = self._merge_simple_list(la, lb, prefer_b)
+                continue
 
-        # Scalars
-        if self._is_empty(a) and not self._is_empty(b):
-            return b
-        return b if (prefer_b and not self._is_empty(b)) else a
+            # admins
+            if k == "telegram_admins":
+                la = v_a if isinstance(v_a, list) else []
+                lb = v_b if isinstance(v_b, list) else []
+                result[k] = self._merge_admins(la, lb, prefer_b)
+                continue
+
+            # scalar-preference fields (explicit)
+            if k in {"market_cap", "about"}:
+                result[k] = self._prefer_scalar(v_a, v_b, prefer_b)
+                continue
+
+            # default: same as scalar preference for unknown keys
+            result[k] = self._prefer_scalar(v_a, v_b, prefer_b)
+
+        return result
 
     def _get_source_priority_index(self, source: str) -> int:
         """Get priority index of a source (lower number = higher priority)"""
